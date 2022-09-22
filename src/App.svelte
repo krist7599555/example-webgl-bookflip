@@ -1,12 +1,12 @@
 <script lang='ts'>
 import { onMount } from 'svelte'
-  import { test_krgl } from './test_krgl';
-  import { test_sgl } from './test_sgl';
+
+  import { test_proxygl } from './test_proxygl';
 let canvas: HTMLCanvasElement;
 
-
 onMount(() => {
-  test_sgl(canvas)
+  console.log("MOUNT")
+  test_proxygl(canvas)
 })
   
 </script>
