@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "alwaysStrict": true,
+    "composite": true,
+    "importHelpers": true,
+    "strictNullChecks": true,
+    "noStrictGenericChecks": false,
+    "strictPropertyInitialization": false,
+    "strict": true,
+    "extendedDiagnostics": true,
+    "moduleResolution": "node",
+    "noErrorTruncation": true,
+    "pretty": true
+  }
+}
