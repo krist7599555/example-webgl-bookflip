@@ -1,36 +1,50 @@
-import { isPlainObject, range } from "lodash-es";
-import { TypedArray } from "type-fest";
-import { assert } from "./krgl/helper";
+import {
+  isArray,
+  isNumber,
+  isPlainObject,
+  isTypedArray,
+  range,
+} from "lodash-es";
+import { match } from "ts-pattern";
+import { Simplify, TypedArray, ValueOf } from "type-fest";
+import { InferAttribute, InferUniform } from "./glsl_string_infer_type";
+import { assert, createProgram, createShader } from "./krgl/helper";
 import {
   gl_parameter_name,
   is_webgl_type,
+  WebglType,
   WEBGL_TYPE_TABLE,
 } from "./sgl/helper";
 
-type ActiveInfo = { size: number; type: string };
+type ActiveInfo = { size: number; type: WebglType };
 
-export function createProxy<
+export function createProxyGLfromShader<
+  VS extends string,
+  FS extends string
+>(opt: { canvas: HTMLCanvasElement; vertex_shader: VS; fragment_shader: FS }) {
+  const { canvas, vertex_shader: vs, fragment_shader: fs } = opt;
+  const gl = canvas.getContext("webgl2")!;
+  const program = createProgram(
+    gl,
+    createShader(gl, gl.VERTEX_SHADER, vs.trim())!,
+    createShader(gl, gl.FRAGMENT_SHADER, fs.trim())!
+  )!;
+  gl.useProgram(program);
+
+  // @ts-ignore
+  return createProxyGLfromWebglProgram<{
+    attributes: Simplify<InferAttribute<VS>>;
+    uniforms: Simplify<InferUniform<VS | FS>>;
+  }>(gl, program);
+}
+
+export function createProxyGLfromWebglProgram<
   T extends {
     attributes: Record<string, ActiveInfo>;
     uniforms: Record<string, ActiveInfo>;
   }
 >(gl: WebGL2RenderingContext, program: WebGLProgram) {
   gl.useProgram(program);
-
-  const deproxy_get = <T, F>(target: T, field: F): boolean => {
-    try {
-      // @ts-ignore
-      const out = target[field];
-      if (isPlainObject(out)) {
-        return { ...out };
-      } else {
-        return out;
-      }
-    } catch (err) {
-      console.error(err);
-      return false;
-    }
-  };
 
   console.log("HI");
   type VAOAttrProxy = {
@@ -43,10 +57,84 @@ export function createProxy<
       offset: number;
       stripe: number;
       buffer: any;
+      divisor: number;
       update_vertex_attrib_pointer(): void;
     };
   };
-  const vertext_array_attribute_original: VAOAttrProxy = range(
+  type UniformProxy = {
+    [key in keyof T["uniforms"]]: {
+      readonly location: WebGLUniformLocation;
+      readonly name: key;
+      readonly size: T["uniforms"][key]["size"];
+      readonly type: T["uniforms"][key]["type"];
+      data: Iterable<number>;
+    };
+  };
+
+  const uniforms: Simplify<UniformProxy> = range(
+    gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
+  ).reduce((acc, i) => {
+    const info = gl.getActiveUniform(program, i)!;
+    const str_type = gl_parameter_name(gl, info.type);
+    assert(is_webgl_type(str_type));
+    const new_uniform: ValueOf<UniformProxy> = new Proxy(
+      {
+        location: gl.getUniformLocation(program, info.name)!,
+        name: info.name,
+        size: info.size,
+        type: str_type,
+        data: [] as Iterable<number>,
+      },
+      {
+        set(target, field, new_val) {
+          if (field == "data") {
+            assert(
+              isTypedArray(new_val) ||
+                (isArray(new_val) && new_val.every(isNumber))
+            );
+            const [...nums] = new_val as
+              | Float32Array
+              | number[]
+              | Iterable<number>;
+
+            // prettier-ignore
+            match(str_type)
+              .with("FLOAT", () => gl.uniform1fv(target.location, nums))
+              .with("FLOAT_VEC2", () => gl.uniform2fv(target.location, nums))
+              .with("FLOAT_VEC3", () => gl.uniform3fv(target.location, nums))
+              .with("FLOAT_VEC4", () => gl.uniform4fv(target.location, nums))
+              .with("INT", () => gl.uniform1iv(target.location, nums))
+              .with("INT_VEC2", () => gl.uniform2iv(target.location, nums))
+              .with("INT_VEC3", () => gl.uniform3iv(target.location, nums))
+              .with("INT_VEC4", () => gl.uniform4iv(target.location, nums))
+              .with("UNSIGNED_INT", () => gl.uniform1uiv(target.location, nums))
+              .with("UNSIGNED_INT_VEC2", () => gl.uniform2uiv(target.location, nums))
+              .with("UNSIGNED_INT_VEC3", () => gl.uniform3uiv(target.location, nums))
+              .with("UNSIGNED_INT_VEC4", () => gl.uniform4uiv(target.location, nums))
+              .with("FLOAT_MAT2", () => gl.uniformMatrix2fv(target.location, false, nums))
+              .with("FLOAT_MAT2x3", () => gl.uniformMatrix2x3fv(target.location, false, nums))
+              .with("FLOAT_MAT2x4", () => gl.uniformMatrix2x4fv(target.location, false, nums))
+              .with("FLOAT_MAT3x2", () => gl.uniformMatrix3x2fv(target.location, false, nums))
+              .with("FLOAT_MAT3", () => gl.uniformMatrix3fv(target.location, false, nums))
+              .with("FLOAT_MAT3x4", () => gl.uniformMatrix3x4fv(target.location, false, nums))
+              .with("FLOAT_MAT4x2", () => gl.uniformMatrix4x2fv(target.location, false, nums))
+              .with("FLOAT_MAT4x3", () => gl.uniformMatrix4x3fv(target.location, false, nums))
+              .with("FLOAT_MAT4", () => gl.uniformMatrix4fv(target.location, false, nums))
+              //@ts-expect-error
+              .exhaustive()
+            target.data = nums;
+            return true;
+          }
+          return false;
+        },
+      }
+    );
+    // @ts-ignore
+    acc[info.name] = new_uniform;
+    return acc;
+  }, {} as UniformProxy);
+
+  const vertext_array_attribute_original: Simplify<VAOAttrProxy> = range(
     gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES)
   ).reduce((acc, i) => {
     const info = gl.getActiveAttrib(program, i)!;
@@ -64,6 +152,7 @@ export function createProxy<
         normalize: false,
         stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
         buffer: null as null | WebGLBuffer,
+        divisor: 0,
         update_vertex_attrib_pointer() {
           gl.vertexAttribPointer(
             a.location,
@@ -107,6 +196,11 @@ export function createProxy<
             target.buffer = res.array_buffer; // INTERNAL USE ACRIVE ARRAY BUFFER
             target.update_vertex_attrib_pointer();
             return true;
+          }
+          if (f == "divisor") {
+            assert(typeof new_val == "number");
+            target.divisor = new_val;
+            gl.vertexAttribDivisor(target.location, new_val);
           }
           return false;
         },
@@ -154,6 +248,9 @@ export function createProxy<
       array_buffer_data: null as TypedArray | null,
       get vertext_array() {
         return vertext_array;
+      },
+      get uniforms() {
+        return uniforms;
       },
       draw_array(opt: {
         mode: "TRIANGLES" | "POINTS";

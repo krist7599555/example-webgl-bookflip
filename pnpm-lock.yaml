@@ -10,10 +10,14 @@ specifiers:
   svelte-preprocess: ^4.10.7
   ts-async-pipe: ^1.1.0
   ts-deepmerge: ^4.0.0
+  ts-pattern: ^4.0.5
   tslib: ^2.4.0
   type-fest: ^2.19.0
   typescript: 4.9.0-dev.20220920
   vite: ^3.1.0
+
+dependencies:
+  ts-pattern: 4.0.5
 
 devDependencies:
   '@sveltejs/vite-plugin-svelte': 1.0.7_svelte@3.50.1+vite@3.1.3
@@ -661,6 +665,10 @@ packages:
     resolution: {integrity: sha512-IrjjAwfM/J6ajWv5wDRZBdpVaTmuONJN1vC85mXlWVPXKelouLFiqsjR7m0h245qY6zZEtcDtcOTc4Rozgg1TQ==}
     engines: {node: '>=14'}
     dev: true
+
+  /ts-pattern/4.0.5:
+    resolution: {integrity: sha512-Bq44KCEt7JVaNLa148mBCJkcQf4l7jtLEBDuDdeuLynWDA+1a60P4D0rMkqSM9mOKLQbIWUddE9h3XKyKwBeqA==}
+    dev: false
 
   /tslib/2.4.0:
     resolution: {integrity: sha512-d6xOpEDfsi2CZVlPQzGeux8XMwLT9hssAsaPYExaQMuYskwb+x1x7J371tWlbBdWHroy99KnVB6qIkUbs5X3UQ==}
