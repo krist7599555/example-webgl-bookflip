@@ -24,6 +24,7 @@
     "vite": "^3.1.0"
   },
   "dependencies": {
+    "@math.gl/core": "^3.6.3",
     "ts-pattern": "^4.0.5"
   }
 }

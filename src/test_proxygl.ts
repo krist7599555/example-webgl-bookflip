@@ -3,19 +3,19 @@ import { animationFrames } from "rxjs";
 import { assert, createProgram, createShader } from "./lib/krgl/helper";
 import { WEBGL_TYPE_TABLE } from "./lib/sgl/helper";
 import type { Split, Trim } from "type-fest";
+import { Matrix3, Matrix4 } from "@math.gl/core";
 
 const vs = /*glsl*/ `#version 300 es
 #pragma vscode_glsllint_stage: vert
 in vec2 a_position;
 in vec3 a_color;
 out vec3 v_color;
-uniform float u_scale;
-uniform vec2 u_translate;
+uniform mat4 u_mvp;
 
 void main() {
   gl_PointSize = 50.0;
   v_color = a_color;
-  gl_Position = vec4(a_position * u_scale + u_translate, 0.0, 1.0);
+  gl_Position = u_mvp * vec4(a_position, 0.0, 1.0);
 }
 ` as const;
 
@@ -68,12 +68,15 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
 
   /* ---------------------------------- DRAW ---------------------------------- */
 
-  gl.clearColor(1, 0.7, 0.8, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
   animationFrames().subscribe(({ timestamp }) => {
-    p.uniforms.u_scale.data = [Math.sin(timestamp * 0.001)];
-    p.uniforms.u_translate.data = [0.3, Math.sin(timestamp * 0.0001)];
+    gl.clearColor(1, 0.7, 0.8, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    const u_mvp = new Matrix4()
+      .identity()
+      .translate([0, Math.sin(timestamp * 0.001), 0])
+      .rotateZ(timestamp * 0.001)
+      .scale(Math.sin(timestamp * 0.001) * 0.3 + 1.0);
+    p.uniforms.u_mvp.data = u_mvp;
     p.uniforms.u_color_opacity.data = [1.0];
     p.draw_array({
       mode: "TRIANGLES",
