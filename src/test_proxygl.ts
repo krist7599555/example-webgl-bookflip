@@ -4,11 +4,10 @@ import { assert, createProgram, createShader } from "./lib/krgl/helper";
 import { WEBGL_TYPE_TABLE } from "./lib/sgl/helper";
 import type { Split, Trim } from "type-fest";
 
-const vs = /*glsl*/ `#version 305 es
+const vs = /*glsl*/ `#version 300 es
 #pragma vscode_glsllint_stage: vert
-layout(location=0) in vec2 a_position;
+in vec2 a_position;
 in vec3 a_color;
-in vec3[2] a_colorx;
 out vec3 v_color;
 uniform float u_scale;
 uniform vec2 u_translate;
@@ -65,9 +64,7 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
   a_color.offset = sz_float * 2;
   a_color.stripe = sz_float * 5;
 
-  p.array_buffer = null;
-
-  p.uniforms.u_scale.data = [0.5];
+  // p.array_buffer = null;
 
   /* ---------------------------------- DRAW ---------------------------------- */
 
@@ -76,6 +73,8 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
 
   animationFrames().subscribe(({ timestamp }) => {
     p.uniforms.u_scale.data = [Math.sin(timestamp * 0.001)];
+    p.uniforms.u_translate.data = [0.3, Math.sin(timestamp * 0.0001)];
+    p.uniforms.u_color_opacity.data = [1.0];
     p.draw_array({
       mode: "TRIANGLES",
       count: 3,

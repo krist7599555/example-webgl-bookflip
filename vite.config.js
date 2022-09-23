@@ -4,6 +4,9 @@ import preprocess from "svelte-preprocess";
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  server: {
+    host: "0.0.0.0",
+  },
   plugins: [
     svelte({
       preprocess: preprocess({
