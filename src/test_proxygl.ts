@@ -76,8 +76,19 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
       .translate([0, Math.sin(timestamp * 0.001), 0])
       .rotateZ(timestamp * 0.001)
       .scale(Math.sin(timestamp * 0.001) * 0.3 + 1.0);
-    p.uniforms.u_mvp.data = u_mvp;
+    const u_mvp2 = new Matrix4()
+      .identity()
+      .translate([Math.sin(timestamp * 0.001), 0, 0])
+      .rotateZ(timestamp * -0.001)
+      .scale(Math.sin(timestamp * 0.001) * 0.3 + 0.5);
     p.uniforms.u_color_opacity.data = [1.0];
+
+    p.uniforms.u_mvp.data = u_mvp;
+    p.draw_array({
+      mode: "TRIANGLES",
+      count: 3,
+    });
+    p.uniforms.u_mvp.data = u_mvp2;
     p.draw_array({
       mode: "TRIANGLES",
       count: 3,
