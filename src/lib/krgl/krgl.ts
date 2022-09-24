@@ -1,25 +1,17 @@
-import type {
-  Simplify,
-  ValueOf,
-  ConditionalPick,
-  Merge,
-  Schema,
-} from "type-fest";
-import { MapValue } from "type-fest/source/entry";
-import type { KrGlslVarType } from "./constant";
-import { createProgram, createShader } from "./helper";
-import { type KrGlBufferString, KrGlBuffer } from "./krgl_buffer";
-import { KrGlLocationAttribute, KrGlLocationUniform } from "./krgl_location";
-import { KrGlVAO } from "./krgo_vao";
-import { DefaultGlslSingleInfo, InferGlslLines } from "./type_helper";
-import type { KrGlContext } from "./type_interface";
+import type { ConditionalPick, Simplify } from 'type-fest';
+
+import { createProgram, createShader } from './helper';
+import { type KrGlBufferString, KrGlBuffer } from './krgl_buffer';
+import { KrGlLocationAttribute, KrGlLocationUniform } from './krgl_location';
+import { KrGlVAO } from './krgo_vao';
+import { DefaultGlslSingleInfo, InferGlslLines } from './type_helper';
+import type { KrGlContext } from './type_interface';
 
 /**
  * KrGl (Krist Webgl2 Wrapper) for easy implement webgl2 **/
 //@ts-ignore
-export class KrGl<
-  WebGlProgramVariable extends Record<string, DefaultGlslSingleInfo>
-> implements KrGlContext
+export class KrGl<WebGlProgramVariable extends Record<string, DefaultGlslSingleInfo>>
+  implements KrGlContext
 {
   /**
    * global enum to reference GLenum
@@ -45,8 +37,8 @@ export class KrGl<
     fragment_shader: string;
     opt?: WebGLContextAttributes;
   }) {
-    this.canvas = opt.canvas ?? document.createElement("canvas");
-    const gl = this.canvas.getContext("webgl2", opt.opt ?? {})!;
+    this.canvas = opt.canvas ?? document.createElement('canvas');
+    const gl = this.canvas.getContext('webgl2', opt.opt ?? {})!;
     this.gl = gl;
     this.program = createProgram(
       gl,
@@ -67,20 +59,14 @@ export class KrGl<
   }
   attribute_location<
     T extends string &
-      keyof ConditionalPick<
-        WebGlProgramVariable,
-        { variable_qualifier: "attribute" }
-      >
-  >(name: T, type: WebGlProgramVariable[T]["data_type"]) {
+      keyof ConditionalPick<WebGlProgramVariable, { variable_qualifier: 'attribute' }>
+  >(name: T, type: WebGlProgramVariable[T]['data_type']) {
     return new KrGlLocationAttribute(this.gl, this.program, name, type);
   }
   uniform_location<
     T extends string &
-      keyof ConditionalPick<
-        WebGlProgramVariable,
-        { variable_qualifier: "uniform" }
-      >
-  >(name: T, type: WebGlProgramVariable[T]["data_type"]) {
+      keyof ConditionalPick<WebGlProgramVariable, { variable_qualifier: 'uniform' }>
+  >(name: T, type: WebGlProgramVariable[T]['data_type']) {
     return new KrGlLocationUniform(this.gl, this.program, name, type);
   }
   create_vao_state() {

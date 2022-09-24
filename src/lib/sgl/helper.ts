@@ -1,5 +1,5 @@
-import type { PartialDeep, Merge } from "type-fest";
-import { merge } from "lodash-es";
+import { merge } from 'lodash-es';
+import type { Merge, PartialDeep } from 'type-fest';
 
 // prettier-ignore
 export const WEBGL_TYPE_TABLE = {
@@ -30,9 +30,9 @@ export const WEBGL_TYPE_TABLE = {
   "FLOAT_MAT4":        { base_type: "FLOAT",        base_type_byte: 4, element_count: 4*4, size_byte: 4 * (4*4) },
 } as const;
 export type WebglType = keyof typeof WEBGL_TYPE_TABLE;
-export type WebglBaseType = typeof WEBGL_TYPE_TABLE[WebglType]["base_type"];
+export type WebglBaseType = typeof WEBGL_TYPE_TABLE[WebglType]['base_type'];
 export function is_webgl_type(s: string): s is WebglType {
-  return s in WEBGL_TYPE_TABLE
+  return s in WEBGL_TYPE_TABLE;
 }
 
 export function gl_parameter_name(gl: WebGL2RenderingContext, value: number) {
@@ -42,12 +42,12 @@ export function gl_parameter_name(gl: WebGL2RenderingContext, value: number) {
       return key;
     }
   }
-  throw new Error("not found");
+  throw new Error('not found');
 }
 
-export function _merge<
-  T extends object,
-  D extends PartialDeep<T, { recurseIntoArrays: false }>
->(base: T, add: D): Merge<T, D> {
+export function _merge<T extends object, D extends PartialDeep<T, { recurseIntoArrays: false }>>(
+  base: T,
+  add: D
+): Merge<T, D> {
   return merge({}, base, add) as any;
 }

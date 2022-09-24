@@ -1,11 +1,4 @@
-import type {
-  ConditionalPick,
-  Merge,
-  Simplify,
-  Split,
-  Trim,
-  StringKeyOf,
-} from "type-fest";
+import type { Merge, Split, StringKeyOf, Trim } from 'type-fest';
 
 export function tf_merge<Lhs, Rhs>(lhs: Lhs, rhs: Rhs): Merge<Lhs, Rhs> {
   return Object.assign({}, lhs, rhs);

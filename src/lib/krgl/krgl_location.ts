@@ -1,19 +1,12 @@
-import {
-  type KrGlslVarInfoType,
-  type KrGlslVarType,
-  TYPECONVERT,
-} from "./constant";
-import { assert } from "./helper";
-import type { KrGlContext } from "./type_interface";
+import { type KrGlslVarInfoType, type KrGlslVarType, TYPECONVERT } from './constant';
+import { assert } from './helper';
+import type { KrGlContext } from './type_interface';
 
 class KrGlLocationBase<NAME extends string, TYPE extends KrGlslVarType> {
   constructor(public readonly name: NAME, public readonly type: TYPE) {}
 }
 
-export class KrGlLocationAttribute<
-    NAME extends string,
-    TYPE extends KrGlslVarType
-  >
+export class KrGlLocationAttribute<NAME extends string, TYPE extends KrGlslVarType>
   extends KrGlLocationBase<NAME, TYPE>
   implements KrGlContext
 {
@@ -45,16 +38,11 @@ export class KrGlLocationAttribute<
     return this;
   }
   set_attr_data_fallback<
-    T extends KrGlslVarInfoType[TYPE]["gl_setter_attr"] = KrGlslVarInfoType[TYPE]["gl_setter_attr"]
+    T extends KrGlslVarInfoType[TYPE]['gl_setter_attr'] = KrGlslVarInfoType[TYPE]['gl_setter_attr']
   >(param: {
-    data: Parameters<WebGL2RenderingContext[T]> extends [number, ...infer Rest]
-      ? Rest
-      : never;
+    data: Parameters<WebGL2RenderingContext[T]> extends [number, ...infer Rest] ? Rest : never;
   }): this {
-    assert(
-      !this.flag.enable_vert_attr_arr,
-      "require enable_vert_attr_arr == false"
-    );
+    assert(!this.flag.enable_vert_attr_arr, 'require enable_vert_attr_arr == false');
     // @ts-ignore
     this.gl[TYPECONVERT[this.type].gl_setter_attr](
       this.location,
@@ -70,10 +58,7 @@ export class KrGlLocationAttribute<
       normalized?: boolean;
     } = {}
   ): this {
-    assert(
-      this.flag.enable_vert_attr_arr,
-      "require enable_vert_attr_arr == true"
-    );
+    assert(this.flag.enable_vert_attr_arr, 'require enable_vert_attr_arr == true');
     this.gl.vertexAttribPointer(
       this.location,
       TYPECONVERT[this.type].element_count,
@@ -106,12 +91,9 @@ export class KrGlLocationUniform<
     assert(this.location);
   }
   set_uniform_data<
-    T extends KrGlslVarInfoType[TYPE]["gl_setter_uniform"] = KrGlslVarInfoType[TYPE]["gl_setter_uniform"]
+    T extends KrGlslVarInfoType[TYPE]['gl_setter_uniform'] = KrGlslVarInfoType[TYPE]['gl_setter_uniform']
   >(param: {
-    data: Parameters<WebGL2RenderingContext[T]> extends [
-      WebGLUniformLocation | null,
-      ...infer Rest
-    ]
+    data: Parameters<WebGL2RenderingContext[T]> extends [WebGLUniformLocation | null, ...infer Rest]
       ? Rest
       : never;
   }) {

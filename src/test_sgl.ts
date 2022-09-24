@@ -1,10 +1,10 @@
-import { KrGl, webgl_bind } from "./lib/krgl";
+import { sync_pipe } from 'ts-async-pipe';
+
 import {
   create_sgl_program,
   sgl_create_vertex_array,
   sgl_enable_vertex_attrib_array,
-} from "./lib/sgl/index";
-import { sync_pipe } from "ts-async-pipe";
+} from './lib/sgl/index';
 
 const vs = /*glsl*/ `#version 300 es
   #pragma vscode_glsllint_stage: vert
@@ -45,9 +45,9 @@ export function test_sgl(canvas: HTMLCanvasElement) {
 
   sync_pipe(
     sgl,
-    (o) => sgl_create_vertex_array(o),
-    (o) => sgl_enable_vertex_attrib_array(o, "a_mvp"),
-    (o) => {
+    o => sgl_create_vertex_array(o),
+    o => sgl_enable_vertex_attrib_array(o, 'a_mvp'),
+    o => {
       console.log(o.state.attributes.a_mvp);
     }
   );

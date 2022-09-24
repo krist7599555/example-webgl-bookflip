@@ -1,4 +1,4 @@
-import { KrGl, webgl_bind } from "./lib/krgl";
+import { KrGl, webgl_bind } from './lib/krgl';
 
 export function test_krgl(canvas: HTMLCanvasElement) {
   const [W, H] = [800, 800] as const;
@@ -25,7 +25,7 @@ export function test_krgl(canvas: HTMLCanvasElement) {
   });
   const vao = krgl.create_vao_state();
   const buffer = krgl
-    .create_buffer("ARRAY_BUFFER")
+    .create_buffer('ARRAY_BUFFER')
     .data(new Float32Array([-0.7, 0, 0.6, 0, 0, 0.7]));
 
   webgl_bind(
@@ -35,7 +35,7 @@ export function test_krgl(canvas: HTMLCanvasElement) {
     },
     () => {
       krgl
-        .attribute_location("a_position", "vec2")
+        .attribute_location('a_position', 'vec2')
         .enable_attr_array()
         .set_attr_to_active_array_buffer({
           offset: 0,

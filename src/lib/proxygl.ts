@@ -1,24 +1,11 @@
-import {
-  isArray,
-  isNumber,
-  isObject,
-  isPlainObject,
-  isTypedArray,
-  keys,
-  range,
-  uniqueId,
-} from "lodash-es";
-import { match } from "ts-pattern";
-import { Simplify, TypedArray, ValueOf } from "type-fest";
-import { InferAttribute, InferUniform } from "./glsl_string_infer_type";
-import { assert, createProgram, createShader } from "./krgl/helper";
-import {
-  gl_parameter_name,
-  is_webgl_type,
-  WebglType,
-  WEBGL_TYPE_TABLE,
-} from "./sgl/helper";
-import { tf_keys } from "./type-fest-runtime";
+import { isArray, isNumber, isObject, isTypedArray, range, uniqueId } from 'lodash-es';
+import { match } from 'ts-pattern';
+import { Simplify, TypedArray, ValueOf } from 'type-fest';
+
+import { InferAttribute, InferUniform } from './glsl_string_infer_type';
+import { assert, createProgram, createShader } from './krgl/helper';
+import { gl_parameter_name, is_webgl_type, WEBGL_TYPE_TABLE, WebglType } from './sgl/helper';
+import { tf_keys } from './type-fest-runtime';
 
 type ActiveInfo = { size: number; type: WebglType };
 
@@ -26,62 +13,58 @@ function _debug_gl(gl: WebGL2RenderingContext): WebGL2RenderingContext {
   const reverse_gl_constant = new Map<number, `gl.${string}`>();
   for (const key of tf_keys(gl)) {
     const val = gl[key];
-    if (key == key.toUpperCase() && typeof val === "number") {
+    if (key == key.toUpperCase() && typeof val === 'number') {
       reverse_gl_constant.set(val, `gl.${key}`);
     }
   }
   function _strinify_arg(i: any) {
-    if (typeof i == "number" && i > 10 && reverse_gl_constant.has(i)) {
+    if (typeof i == 'number' && i > 10 && reverse_gl_constant.has(i)) {
       return reverse_gl_constant.get(i);
     }
-    if (i && typeof i == "object" && typeof i[Symbol.iterator] == "function") {
+    if (i && typeof i == 'object' && typeof i[Symbol.iterator] == 'function') {
       return JSON.stringify(Array.from(i));
     }
     return `${i}`;
   }
   WebGLBuffer.prototype.toString = function () {
-    return this.debug_id
-      ? `[object WebGLBuffer(id=${this.debug_id})]`
-      : `[object WebGLBuffer]`;
+    return this.debug_id ? `[object WebGLBuffer(id=${this.debug_id})]` : `[object WebGLBuffer]`;
   };
   return new Proxy(gl, {
-    get(t, _p, r) {
-      assert(typeof _p == "string");
+    get(t, _p) {
+      assert(typeof _p == 'string');
       const p = _p as keyof WebGL2RenderingContext;
       try {
-        let o: any = Reflect.get(t, p, gl);
-        if (typeof o === "function") {
+        const o: any = Reflect.get(t, p, gl);
+        if (typeof o === 'function') {
           return (...args: any[]) => {
-            const str_command = `gl.${p}(${args
-              .map(_strinify_arg)
-              .join(", ")})`;
-            console.log("[DEUBGGL:CALL]", str_command);
+            const str_command = `gl.${p}(${args.map(_strinify_arg).join(', ')})`;
+            console.log('[DEUBGGL:CALL]', str_command);
             const res = o.bind(gl)(...args);
-            if (p === "createBuffer" && res instanceof WebGLBuffer) {
-              res.debug_id =
-                typeof args[0] == "string" ? args[0] : uniqueId("auto-");
+            if (p === 'createBuffer' && res instanceof WebGLBuffer) {
+              res.debug_id = typeof args[0] == 'string' ? args[0] : uniqueId('auto-');
             }
             if (res) {
-              console.log("[DEUBGGL:CALL]", str_command, "=", res);
+              console.log('[DEUBGGL:CALL]', str_command, '=', res);
             }
             return res;
           };
         }
         return o;
       } catch (err) {
-        console.log("[DEBUGGL:ERROR]", `gl.${p.toString()}`);
+        console.log('[DEBUGGL:ERROR]', `gl.${p.toString()}`);
         throw err;
       }
     },
   });
 }
 
-export function createProxyGLfromShader<
-  VS extends string,
-  FS extends string
->(opt: { canvas: HTMLCanvasElement; vertex_shader: VS; fragment_shader: FS }) {
+export function createProxyGLfromShader<VS extends string, FS extends string>(opt: {
+  canvas: HTMLCanvasElement;
+  vertex_shader: VS;
+  fragment_shader: FS;
+}) {
   const { canvas, vertex_shader: vs, fragment_shader: fs } = opt;
-  const gl = _debug_gl(canvas.getContext("webgl2")!);
+  const gl = _debug_gl(canvas.getContext('webgl2')!);
   const program = createProgram(
     gl,
     createShader(gl, gl.VERTEX_SHADER, vs.trim())!,
@@ -105,7 +88,7 @@ export function createProxyGLfromWebglProgram<
   gl.useProgram(program);
 
   type VAOAttrProxy = {
-    [key in keyof T["attributes"]]: {
+    [key in keyof T['attributes']]: {
       /**
        * real webgl location from program
        */
@@ -117,11 +100,11 @@ export function createProxyGLfromWebglProgram<
       /**
        * @type {gl.getAttribLocation().size}
        */
-      readonly size: T["attributes"][key]["size"];
+      readonly size: T['attributes'][key]['size'];
       /**
        * @type {"FLOAT"|"FLOAT_VEC2"|"FLOAT_VEC3"|"FLOAT_MAT3"|"FLOAT_MAT4" }
        */
-      readonly type: T["attributes"][key]["type"];
+      readonly type: T['attributes'][key]['type'];
       /**
        * invoke
        * @type {gl.enableVertexAttribArray} + @type {gl.vertexAttribPointer}
@@ -168,11 +151,11 @@ export function createProxyGLfromWebglProgram<
     };
   };
   type UniformProxy = {
-    [key in keyof T["uniforms"]]: {
+    [key in keyof T['uniforms']]: {
       readonly location: WebGLUniformLocation;
       readonly name: key;
-      readonly size: T["uniforms"][key]["size"];
-      readonly type: T["uniforms"][key]["type"];
+      readonly size: T['uniforms'][key]['size'];
+      readonly type: T['uniforms'][key]['type'];
       data: Iterable<number>;
     };
   };
@@ -193,15 +176,9 @@ export function createProxyGLfromWebglProgram<
       },
       {
         set(target, field, new_val) {
-          if (field == "data") {
-            assert(
-              isTypedArray(new_val) ||
-                (isArray(new_val) && new_val.every(isNumber))
-            );
-            const [...nums] = new_val as
-              | Float32Array
-              | number[]
-              | Iterable<number>;
+          if (field == 'data') {
+            assert(isTypedArray(new_val) || (isArray(new_val) && new_val.every(isNumber)));
+            const [...nums] = new_val as Float32Array | number[] | Iterable<number>;
 
             // prettier-ignore
             match(str_type)
@@ -259,11 +236,11 @@ export function createProxyGLfromWebglProgram<
         stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
         buffer: null as null | WebGLBuffer,
         divisor: 0,
-        get _loc_and_offset(): VAOAttrProxy[keyof VAOAttrProxy]["_loc_and_offset"] {
-          if (str_type.includes("MAT")) {
-            const [srow, scol = srow] = str_type.split("MAT")[1].split("x");
+        get _loc_and_offset(): VAOAttrProxy[keyof VAOAttrProxy]['_loc_and_offset'] {
+          if (str_type.includes('MAT')) {
+            const [srow, scol = srow] = str_type.split('MAT')[1].split('x');
             const [row, col] = [+srow, +scol];
-            return range(0, row).map((i) => ({
+            return range(0, row).map(i => ({
               loc: (a.location + i) as number,
               row,
               col,
@@ -284,7 +261,7 @@ export function createProxyGLfromWebglProgram<
         },
         update_vertex_attrib_pointer() {
           const base_type = WEBGL_TYPE_TABLE[a.type].base_type;
-          assert(base_type == "FLOAT");
+          assert(base_type == 'FLOAT');
           const base_type_i = gl[base_type];
           for (const o of this._loc_and_offset) {
             gl.vertexAttribPointer(
@@ -299,14 +276,14 @@ export function createProxyGLfromWebglProgram<
         },
       },
       {
-        set(target, field, new_val, receive) {
+        set(target, field, new_val, _receive) {
           const f: keyof typeof target = field as any;
-          if (f == "buffer") {
-            console.error("not allow set buffer");
+          if (f == 'buffer') {
+            console.error('not allow set buffer');
             return false;
           }
-          if (f == "enabled") {
-            assert(typeof new_val == "boolean");
+          if (f == 'enabled') {
+            assert(typeof new_val == 'boolean');
             target.enabled = new_val;
             if (new_val) {
               for (const o of target._loc_and_offset) {
@@ -320,22 +297,22 @@ export function createProxyGLfromWebglProgram<
             }
             return true;
           }
-          if (f == "offset" || f == "stripe") {
+          if (f == 'offset' || f == 'stripe') {
             assert(
               res.array_buffer,
-              "require bind array buffer first before set vertexAttribPointer"
+              'require bind array buffer first before set vertexAttribPointer'
             );
-            assert(typeof new_val == "number");
+            assert(typeof new_val == 'number');
             // @ts-ignore
             const gl_type = gl[target.type];
-            assert(typeof gl_type == "number");
+            assert(typeof gl_type == 'number');
             target[f] = new_val;
             target.buffer = res.array_buffer; // INTERNAL USE ACRIVE ARRAY BUFFER
             target.update_vertex_attrib_pointer();
             return true;
           }
-          if (f == "divisor") {
-            assert(typeof new_val == "number");
+          if (f == 'divisor') {
+            assert(typeof new_val == 'number');
             target.divisor = new_val;
             for (const o of target._loc_and_offset) {
               gl.vertexAttribDivisor(o.loc, new_val);
@@ -349,14 +326,11 @@ export function createProxyGLfromWebglProgram<
     return { ...acc, [info.name]: a };
   }, {} as VAOAttrProxy);
 
-  const vertext_array_attribute_proxy = new Proxy(
-    vertext_array_attribute_original,
-    {
-      set(target, p, newValue, receiver) {
-        return false;
-      },
-    }
-  );
+  const vertext_array_attribute_proxy = new Proxy(vertext_array_attribute_original, {
+    set() {
+      return false;
+    },
+  });
   const vao = gl.createVertexArray()!; // TODO: for now have single vao
   gl.bindVertexArray(vao);
   const vertext_array = new Proxy(
@@ -389,26 +363,16 @@ export function createProxyGLfromWebglProgram<
           | TypedArray
           | {
               data: TypedArray;
-              usage?: "STATIC_DRAW" | "DYNAMIC_DRAW" | "STREAM_DRAW";
+              usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
               offset?: number;
               length?: number;
             }
       ) {
         assert(res.array_buffer);
-        const [
-          data,
-          usage = "STATIC_DRAW",
-          offset = undefined,
-          length = undefined,
-        ] =
-          isObject(opt) && "data" in opt
-            ? [
-                opt.data,
-                opt.usage ?? ("STATIC_DRAW" as const),
-                opt.offset,
-                opt.length,
-              ]
-            : [opt, "STATIC_DRAW" as const, 0];
+        const [data, usage = 'STATIC_DRAW', offset = undefined, length = undefined] =
+          isObject(opt) && 'data' in opt
+            ? [opt.data, opt.usage ?? ('STATIC_DRAW' as const), opt.offset, opt.length]
+            : [opt, 'STATIC_DRAW' as const, 0];
 
         gl.bufferData(gl.ARRAY_BUFFER, data, gl[usage], offset ?? 0, length);
       },
@@ -418,25 +382,16 @@ export function createProxyGLfromWebglProgram<
       get uniforms() {
         return uniforms;
       },
-      draw_array(opt: {
-        mode: "TRIANGLES" | "POINTS";
-        count: number;
-        first?: number;
-      }) {
+      draw_array(opt: { mode: 'TRIANGLES' | 'POINTS'; count: number; first?: number }) {
         gl.drawArrays(gl[opt.mode], opt.first ?? 0, opt.count);
       },
       draw_array_instanced(opt: {
-        mode: "TRIANGLES" | "POINTS";
+        mode: 'TRIANGLES' | 'POINTS';
         count: number;
         instance_count: number;
         first?: number;
       }) {
-        gl.drawArraysInstanced(
-          gl[opt.mode],
-          opt.first ?? 0,
-          opt.count,
-          opt.instance_count
-        );
+        gl.drawArraysInstanced(gl[opt.mode], opt.first ?? 0, opt.count, opt.instance_count);
       },
     },
     {
@@ -444,7 +399,7 @@ export function createProxyGLfromWebglProgram<
       //   return deproxy_get(t, f);
       // },
       set(target, field, new_val, old_val) {
-        if (field == "array_buffer") {
+        if (field == 'array_buffer') {
           assert(new_val === null || new_val instanceof WebGLBuffer);
           target.array_buffer = new_val;
           gl.bindBuffer(gl.ARRAY_BUFFER, new_val);
@@ -456,6 +411,6 @@ export function createProxyGLfromWebglProgram<
   );
 
   // @ts-expect-error
-  window["proxygl"] = res;
+  window['proxygl'] = res;
   return res;
 }

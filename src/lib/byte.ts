@@ -31,10 +31,8 @@ type ByteStruct = keyof typeof EL_COUNT;
 type ByteKey = ByteBase | ByteStruct | `${ByteBase}_${ByteStruct}`;
 
 /** BYTE is proxy object to retrive size in byte of everything */
-export const BYTE = new Proxy<
-  Record<Lowercase<ByteKey> | Uppercase<ByteKey>, number>
->({} as any, {
-  get(target, _p, receiver) {
+export const BYTE = new Proxy<Record<Lowercase<ByteKey> | Uppercase<ByteKey>, number>>({} as any, {
+  get(target, _p, _receiver) {
     const p = _p.toString().toLowerCase() as Lowercase<ByteKey>;
 
     // @ts-ignore
@@ -47,7 +45,7 @@ export const BYTE = new Proxy<
     }
     // @ts-ignore
     const o = EL_SIZE[r.groups.base] * EL_COUNT[r.groups.count];
-    if (typeof o != "number" || !Number.isInteger(o)) {
+    if (typeof o != 'number' || !Number.isInteger(o)) {
       throw new Error(`byte of ${p} not found`);
     }
     return o;

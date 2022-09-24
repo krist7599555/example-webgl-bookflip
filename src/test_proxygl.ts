@@ -1,12 +1,8 @@
-import { createProxyGLfromShader } from "./lib/proxygl";
-import { animationFrames, take } from "rxjs";
-import { assert, createProgram, createShader } from "./lib/krgl/helper";
-import { WEBGL_TYPE_TABLE } from "./lib/sgl/helper";
-import type { Split, Trim } from "type-fest";
-import { Matrix3, Matrix4 } from "@math.gl/core";
-import { tf_split, tf_str_includes } from "./lib/type-fest-runtime";
-import { anonymousSelectKey } from "ts-pattern/dist/internals/symbols";
-import { BYTE } from "./lib/byte";
+import { Matrix4 } from '@math.gl/core';
+import { animationFrames } from 'rxjs';
+
+import { BYTE } from './lib/byte';
+import { createProxyGLfromShader } from './lib/proxygl';
 
 const vs = /*glsl*/ `#version 300 es
 #pragma vscode_glsllint_stage: vert
@@ -51,13 +47,13 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
   const gl = p.gl;
 
   // @ts-ignore
-  window["p"] = p;
+  window['p'] = p;
 
   /* -------------------------------- SET DATA -------------------------------- */
 
   const { a_position, a_color, a_mvp } = p.vertext_array.attributes;
 
-  p.array_buffer = gl.createBuffer("MyMainBuffer"); // internaly bind
+  p.array_buffer = gl.createBuffer('MyMainBuffer'); // internaly bind
   p.array_buffer_data = new Float32Array([
     ...[-0.7, -0.5, 1, 0, 0],
     ...[0.6, 0, 0, 1, 0],
@@ -85,7 +81,7 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
   ]);
   p.array_buffer_data = {
     data: mvp_data,
-    usage: "DYNAMIC_DRAW",
+    usage: 'DYNAMIC_DRAW',
   };
   a_mvp.enabled = true;
   a_mvp.divisor = 1;
@@ -113,11 +109,7 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
         BYTE.mat4 * 2,
         new Matrix4()
           .identity()
-          .translate([
-            Math.sin(timestamp * 0.001) * 0.5,
-            Math.cos(timestamp * 0.001) * 0.5,
-            0.0,
-          ])
+          .translate([Math.sin(timestamp * 0.001) * 0.5, Math.cos(timestamp * 0.001) * 0.5, 0.0])
           .rotateZ(Math.PI * 0.5)
           .scale(0.5 * Math.sin(timestamp * 0.001))
           .toArray(new Float32Array(16))
@@ -125,7 +117,7 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
       p.array_buffer = null;
 
       p.draw_array_instanced({
-        mode: "TRIANGLES",
+        mode: 'TRIANGLES',
         count: 3,
         instance_count: 3,
       });

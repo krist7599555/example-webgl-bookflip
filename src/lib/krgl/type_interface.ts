@@ -1,4 +1,4 @@
-import { GlFunc, GlTargets } from "./webgl_binding_target";
+import { GlFunc, GlTargets } from './webgl_binding_target';
 
 export interface KrGlBiding {
   bind(fn: () => void): this;
