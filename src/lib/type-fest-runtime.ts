@@ -16,6 +16,13 @@ export function tf_split<S extends string, Delimiter extends string>(
 ): Split<S, Delimiter> {
   return s.split(d) as any;
 }
+export function tf_str_includes<S extends string, M extends string>(
+  s: S,
+  m: M
+  // @ts-ignore
+): s is `${string}${M}${string}` {
+  return s.includes(m);
+}
 export function tf_trim<S extends string>(s: S): Trim<S> {
   return s.trim() as any;
 }

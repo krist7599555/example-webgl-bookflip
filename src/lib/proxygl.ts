@@ -1,6 +1,7 @@
 import {
   isArray,
   isNumber,
+  isObject,
   isPlainObject,
   isTypedArray,
   keys,
@@ -105,15 +106,57 @@ export function createProxyGLfromWebglProgram<
 
   type VAOAttrProxy = {
     [key in keyof T["attributes"]]: {
+      /**
+       * real webgl location from program
+       */
       readonly location: number;
+      /**
+       * real webgl attribute name in glsl
+       */
       readonly name: key;
+      /**
+       * @type {gl.getAttribLocation().size}
+       */
       readonly size: T["attributes"][key]["size"];
+      /**
+       * @type {"FLOAT"|"FLOAT_VEC2"|"FLOAT_VEC3"|"FLOAT_MAT3"|"FLOAT_MAT4" }
+       */
       readonly type: T["attributes"][key]["type"];
+      /**
+       * invoke
+       * @type {gl.enableVertexAttribArray} + @type {gl.vertexAttribPointer}
+       * @type {gl.disableVertexAttribArray}
+       * @default false
+       **/
       enabled: boolean;
+      /**
+       * @proxy @type {gl.vertexAttribPointer}
+       * @default 0
+       **/
       offset: number;
+      /**
+       * @proxy @type {gl.vertexAttribPointer}
+       * @default WEBGL_TYPE_TABLE[.type].size_byte
+       **/
       stripe: number;
+      /**
+       * @proxy @type {gl.bindData}
+       **/
       buffer: any;
+      /**
+       * @proxy @type {gl.vertexAttribDivisor}
+       * @default 0
+       **/
       divisor: number;
+
+      /** helper becaule attribute process data by `vec4`. for `mat4` you need to call
+       * ```js
+       * gl.somefunc(loc)
+       * gl.somefunc(loc+2)
+       * gl.somefunc(loc+3)
+       * gl.somefunc(loc+4)
+       * ```
+       **/
       readonly _loc_and_offset: {
         loc: number;
         row: number;
@@ -269,6 +312,7 @@ export function createProxyGLfromWebglProgram<
               for (const o of target._loc_and_offset) {
                 gl.enableVertexAttribArray(o.loc);
               }
+              target.update_vertex_attrib_pointer();
             } else {
               for (const o of target._loc_and_offset) {
                 gl.disableVertexAttribArray(o.loc);
@@ -340,7 +384,34 @@ export function createProxyGLfromWebglProgram<
         return program;
       },
       array_buffer: null as WebGLBuffer | null,
-      array_buffer_data: null as TypedArray | null,
+      set array_buffer_data(
+        opt:
+          | TypedArray
+          | {
+              data: TypedArray;
+              usage?: "STATIC_DRAW" | "DYNAMIC_DRAW" | "STREAM_DRAW";
+              offset?: number;
+              length?: number;
+            }
+      ) {
+        assert(res.array_buffer);
+        const [
+          data,
+          usage = "STATIC_DRAW",
+          offset = undefined,
+          length = undefined,
+        ] =
+          isObject(opt) && "data" in opt
+            ? [
+                opt.data,
+                opt.usage ?? ("STATIC_DRAW" as const),
+                opt.offset,
+                opt.length,
+              ]
+            : [opt, "STATIC_DRAW" as const, 0];
+
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl[usage], offset ?? 0, length);
+      },
       get vertext_array() {
         return vertext_array;
       },
@@ -354,28 +425,32 @@ export function createProxyGLfromWebglProgram<
       }) {
         gl.drawArrays(gl[opt.mode], opt.first ?? 0, opt.count);
       },
+      draw_array_instanced(opt: {
+        mode: "TRIANGLES" | "POINTS";
+        count: number;
+        instance_count: number;
+        first?: number;
+      }) {
+        gl.drawArraysInstanced(
+          gl[opt.mode],
+          opt.first ?? 0,
+          opt.count,
+          opt.instance_count
+        );
+      },
     },
     {
       // get(t, f) {
       //   return deproxy_get(t, f);
       // },
       set(target, field, new_val, old_val) {
-        if (field == "array_buffer_data") {
-          // TODO: not a cool name should it be target.array_buffer.read(...)
-          target.array_buffer_data = new_val;
-          gl.bufferData(gl.ARRAY_BUFFER, new_val, gl.STATIC_DRAW);
-          return true;
-        }
         if (field == "array_buffer") {
           assert(new_val === null || new_val instanceof WebGLBuffer);
           target.array_buffer = new_val;
-          if (!new_val) {
-            target.array_buffer_data = null; // TODO: clean
-          }
           gl.bindBuffer(gl.ARRAY_BUFFER, new_val);
           return true;
         }
-        return false;
+        return Reflect.set(target, field, new_val, old_val);
       },
     }
   );

@@ -4,6 +4,9 @@ import { assert, createProgram, createShader } from "./lib/krgl/helper";
 import { WEBGL_TYPE_TABLE } from "./lib/sgl/helper";
 import type { Split, Trim } from "type-fest";
 import { Matrix3, Matrix4 } from "@math.gl/core";
+import { tf_split, tf_str_includes } from "./lib/type-fest-runtime";
+import { anonymousSelectKey } from "ts-pattern/dist/internals/symbols";
+import { BYTE } from "./lib/byte";
 
 const vs = /*glsl*/ `#version 300 es
 #pragma vscode_glsllint_stage: vert
@@ -16,12 +19,12 @@ void main() {
   gl_PointSize = 50.0;
   v_color = a_color;
   mat4 ar = a_mvp;
-  for (int i = 0; i < 4; ++i) {
-    for (int j = 0; j < 4; ++j) {
-      ar[i][j] = 0.0;
-    }
-    ar[i][i] = 1.0;
-  }
+  // for (int i = 0; i < 4; ++i) {
+  //   for (int j = 0; j < 4; ++j) {
+  //     ar[i][j] = 0.0;
+  //   }
+  //   ar[i][i] = 1.0;
+  // }
   gl_Position = ar * vec4(a_position, 0.0, 1.0);
   // gl_Position = vec4(a_position, 0.0, 1.0);
 }
@@ -53,66 +56,78 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
   /* -------------------------------- SET DATA -------------------------------- */
 
   const { a_position, a_color, a_mvp } = p.vertext_array.attributes;
-  const sz_float = WEBGL_TYPE_TABLE.FLOAT.size_byte;
 
   p.array_buffer = gl.createBuffer("MyMainBuffer"); // internaly bind
   p.array_buffer_data = new Float32Array([
-    -0.7, -0.5, 1, 0, 0,
-    //
-    0.6, 0, 0, 1, 0,
-    //
-    0, 0.7, 0, 0, 1,
+    ...[-0.7, -0.5, 1, 0, 0],
+    ...[0.6, 0, 0, 1, 0],
+    ...[0, 0.7, 0, 0, 1],
   ]);
+
   a_position.enabled = true;
-  gl.vertexAttrib2f(a_position.location, 0.5, 0);
-  a_position.offset = sz_float * 0;
-  a_position.stripe = sz_float * 5;
+  a_position.offset = 0;
+  a_position.stripe = BYTE.vec2 + BYTE.vec3;
 
   a_color.enabled = true;
-  a_color.offset = sz_float * 2;
-  a_color.stripe = sz_float * 5;
-
+  a_color.offset = BYTE.vec2;
+  a_color.stripe = BYTE.vec2 + BYTE.vec3;
   p.array_buffer = null;
 
-  p.array_buffer = gl.createBuffer();
-  p.array_buffer_data = new Float32Array([
-    ...new Matrix4().identity(),
-    ...new Matrix4().identity(),
-    ...new Matrix4().identity(),
+  const mvp_buffer = (p.array_buffer = gl.createBuffer());
+  const mvp_data = new Float32Array([
+    ...new Matrix4().identity().rotateX(Math.PI).translate([-0.3, 0, 0]),
+    ...new Matrix4().identity().rotateX(0),
+    ...new Matrix4()
+      .identity()
+      .translate([0.5, 0.5, 0.0])
+      .rotateZ(Math.PI * 0.5)
+      .scale(0.5),
   ]);
+  p.array_buffer_data = {
+    data: mvp_data,
+    usage: "DYNAMIC_DRAW",
+  };
   a_mvp.enabled = true;
-  a_mvp.stripe = sz_float * 4 * 4;
-  a_mvp.offset = sz_float * 0;
+  a_mvp.divisor = 1;
   p.array_buffer = null;
 
   /* ---------------------------------- DRAW ---------------------------------- */
 
   animationFrames()
-    .pipe(take(1))
-    .subscribe(
-      ({ timestamp }) => {
-        gl.clearColor(1, 0.7, 0.8, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-
-        const u_mvp = new Matrix4()
+    // .pipe(take(1))
+    .subscribe(function ({ timestamp }) {
+      gl.clearColor(1, 0.7, 0.8, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      p.array_buffer = mvp_buffer;
+      gl.bufferSubData(
+        gl.ARRAY_BUFFER,
+        BYTE.mat4 * 0,
+        new Matrix4()
           .identity()
-          .translate([0, Math.sin(timestamp * 0.001), 0])
-          .rotateZ(timestamp * 0.001)
-          .scale(Math.sin(timestamp * 0.001) * 0.3 + 1.0);
-        const u_mvp2 = new Matrix4()
+          .rotateX(timestamp * 0.001)
+          .translate([-0.3, 0, 0])
+          .toArray(new Float32Array(16))
+      );
+      gl.bufferSubData(
+        gl.ARRAY_BUFFER,
+        BYTE.mat4 * 2,
+        new Matrix4()
           .identity()
-          .translate([Math.sin(timestamp * 0.001), 0, 0])
-          .rotateZ(timestamp * -0.001)
-          .scale(Math.sin(timestamp * 0.001) * 0.3 + 0.5);
+          .translate([
+            Math.sin(timestamp * 0.001) * 0.5,
+            Math.cos(timestamp * 0.001) * 0.5,
+            0.0,
+          ])
+          .rotateZ(Math.PI * 0.5)
+          .scale(0.5 * Math.sin(timestamp * 0.001))
+          .toArray(new Float32Array(16))
+      );
+      p.array_buffer = null;
 
-        // gl.drawArraysInstanced(gl.TRIANGLES, 0, 3, 2);
-        p.draw_array({
-          mode: "TRIANGLES",
-          count: 3,
-        });
-      }
-      //
-    );
-
-  // TODO: try drawArrayInstance
+      p.draw_array_instanced({
+        mode: "TRIANGLES",
+        count: 3,
+        instance_count: 3,
+      });
+    });
 }
