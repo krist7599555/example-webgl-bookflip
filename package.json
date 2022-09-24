@@ -1,12 +1,18 @@
 {
   "name": "example-webgl-bookflip",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
+    "dev": "vite",
+    "lint": "prettier . && eslint .",
     "preview": "vite preview"
+  },
+  "dependencies": {
+    "@krist7599555/harmony-editorconfig": "^0.1.4",
+    "@math.gl/core": "^3.6.3",
+    "ts-pattern": "^4.0.5"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^1.0.2",
@@ -22,9 +28,5 @@
     "type-fest": "^2.19.0",
     "typescript": "4.9.0-dev.20220920",
     "vite": "^3.1.0"
-  },
-  "dependencies": {
-    "@math.gl/core": "^3.6.3",
-    "ts-pattern": "^4.0.5"
   }
 }
