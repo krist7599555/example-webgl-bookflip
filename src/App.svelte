@@ -11,4 +11,4 @@ onMount(() => {
   
 </script>
 
-<canvas bind:this={canvas}></canvas>
+<canvas style="max-width: 100vw; max-height: 100vh;" bind:this={canvas}></canvas>

@@ -3,7 +3,9 @@ import {
   isNumber,
   isPlainObject,
   isTypedArray,
+  keys,
   range,
+  uniqueId,
 } from "lodash-es";
 import { match } from "ts-pattern";
 import { Simplify, TypedArray, ValueOf } from "type-fest";
@@ -15,15 +17,70 @@ import {
   WebglType,
   WEBGL_TYPE_TABLE,
 } from "./sgl/helper";
+import { tf_keys } from "./type-fest-runtime";
 
 type ActiveInfo = { size: number; type: WebglType };
+
+function _debug_gl(gl: WebGL2RenderingContext): WebGL2RenderingContext {
+  const reverse_gl_constant = new Map<number, `gl.${string}`>();
+  for (const key of tf_keys(gl)) {
+    const val = gl[key];
+    if (key == key.toUpperCase() && typeof val === "number") {
+      reverse_gl_constant.set(val, `gl.${key}`);
+    }
+  }
+  function _strinify_arg(i: any) {
+    if (typeof i == "number" && i > 10 && reverse_gl_constant.has(i)) {
+      return reverse_gl_constant.get(i);
+    }
+    if (i && typeof i == "object" && typeof i[Symbol.iterator] == "function") {
+      return JSON.stringify(Array.from(i));
+    }
+    return `${i}`;
+  }
+  WebGLBuffer.prototype.toString = function () {
+    return this.debug_id
+      ? `[object WebGLBuffer(id=${this.debug_id})]`
+      : `[object WebGLBuffer]`;
+  };
+  return new Proxy(gl, {
+    get(t, _p, r) {
+      assert(typeof _p == "string");
+      const p = _p as keyof WebGL2RenderingContext;
+      try {
+        let o: any = Reflect.get(t, p, gl);
+        if (typeof o === "function") {
+          return (...args: any[]) => {
+            const str_command = `gl.${p}(${args
+              .map(_strinify_arg)
+              .join(", ")})`;
+            console.log("[DEUBGGL:CALL]", str_command);
+            const res = o.bind(gl)(...args);
+            if (p === "createBuffer" && res instanceof WebGLBuffer) {
+              res.debug_id =
+                typeof args[0] == "string" ? args[0] : uniqueId("auto-");
+            }
+            if (res) {
+              console.log("[DEUBGGL:CALL]", str_command, "=", res);
+            }
+            return res;
+          };
+        }
+        return o;
+      } catch (err) {
+        console.log("[DEBUGGL:ERROR]", `gl.${p.toString()}`);
+        throw err;
+      }
+    },
+  });
+}
 
 export function createProxyGLfromShader<
   VS extends string,
   FS extends string
 >(opt: { canvas: HTMLCanvasElement; vertex_shader: VS; fragment_shader: FS }) {
   const { canvas, vertex_shader: vs, fragment_shader: fs } = opt;
-  const gl = canvas.getContext("webgl2")!;
+  const gl = _debug_gl(canvas.getContext("webgl2")!);
   const program = createProgram(
     gl,
     createShader(gl, gl.VERTEX_SHADER, vs.trim())!,
@@ -46,7 +103,6 @@ export function createProxyGLfromWebglProgram<
 >(gl: WebGL2RenderingContext, program: WebGLProgram) {
   gl.useProgram(program);
 
-  console.log("HI");
   type VAOAttrProxy = {
     [key in keyof T["attributes"]]: {
       readonly location: number;
@@ -58,6 +114,13 @@ export function createProxyGLfromWebglProgram<
       stripe: number;
       buffer: any;
       divisor: number;
+      readonly _loc_and_offset: {
+        loc: number;
+        row: number;
+        col: number;
+        offset: number;
+        stripe: number;
+      }[];
       update_vertex_attrib_pointer(): void;
     };
   };
@@ -143,7 +206,7 @@ export function createProxyGLfromWebglProgram<
     // @ts-ignore
     const a = new Proxy(
       {
-        location: i,
+        location: gl.getAttribLocation(program, info.name),
         name: info.name,
         size: info.size,
         type: str_type,
@@ -153,20 +216,47 @@ export function createProxyGLfromWebglProgram<
         stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
         buffer: null as null | WebGLBuffer,
         divisor: 0,
+        get _loc_and_offset(): VAOAttrProxy[keyof VAOAttrProxy]["_loc_and_offset"] {
+          if (str_type.includes("MAT")) {
+            const [srow, scol = srow] = str_type.split("MAT")[1].split("x");
+            const [row, col] = [+srow, +scol];
+            return range(0, row).map((i) => ({
+              loc: (a.location + i) as number,
+              row,
+              col,
+              offset: WEBGL_TYPE_TABLE[str_type].base_type_byte * i * row,
+              stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
+            }));
+          } else {
+            return [
+              {
+                loc: a.location,
+                row: 1,
+                col: WEBGL_TYPE_TABLE[str_type].element_count,
+                offset: 0,
+                stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
+              },
+            ];
+          }
+        },
         update_vertex_attrib_pointer() {
-          gl.vertexAttribPointer(
-            a.location,
-            WEBGL_TYPE_TABLE[a.type].element_count,
-            gl[WEBGL_TYPE_TABLE[a.type].base_type],
-            a.normalize,
-            a.stripe,
-            a.offset
-          );
+          const base_type = WEBGL_TYPE_TABLE[a.type].base_type;
+          assert(base_type == "FLOAT");
+          const base_type_i = gl[base_type];
+          for (const o of this._loc_and_offset) {
+            gl.vertexAttribPointer(
+              o.loc,
+              o.col,
+              base_type_i,
+              a.normalize,
+              a.stripe,
+              a.offset + o.offset
+            );
+          }
         },
       },
       {
         set(target, field, new_val, receive) {
-          console.log("SET ATTR", info.name, field, new_val);
           const f: keyof typeof target = field as any;
           if (f == "buffer") {
             console.error("not allow set buffer");
@@ -175,11 +265,14 @@ export function createProxyGLfromWebglProgram<
           if (f == "enabled") {
             assert(typeof new_val == "boolean");
             target.enabled = new_val;
-            console.log("WEBGL location enabled", new_val);
             if (new_val) {
-              gl.enableVertexAttribArray(target.location);
+              for (const o of target._loc_and_offset) {
+                gl.enableVertexAttribArray(o.loc);
+              }
             } else {
-              gl.disableVertexAttribArray(target.location);
+              for (const o of target._loc_and_offset) {
+                gl.disableVertexAttribArray(o.loc);
+              }
             }
             return true;
           }
@@ -200,7 +293,10 @@ export function createProxyGLfromWebglProgram<
           if (f == "divisor") {
             assert(typeof new_val == "number");
             target.divisor = new_val;
-            gl.vertexAttribDivisor(target.location, new_val);
+            for (const o of target._loc_and_offset) {
+              gl.vertexAttribDivisor(o.loc, new_val);
+            }
+            return true;
           }
           return false;
         },
@@ -213,7 +309,6 @@ export function createProxyGLfromWebglProgram<
     vertext_array_attribute_original,
     {
       set(target, p, newValue, receiver) {
-        console.log([target, p, newValue, receiver]);
         return false;
       },
     }
@@ -277,7 +372,6 @@ export function createProxyGLfromWebglProgram<
           if (!new_val) {
             target.array_buffer_data = null; // TODO: clean
           }
-          console.log("WEGL bind array buffer", new_val);
           gl.bindBuffer(gl.ARRAY_BUFFER, new_val);
           return true;
         }
@@ -285,5 +379,8 @@ export function createProxyGLfromWebglProgram<
       },
     }
   );
+
+  // @ts-expect-error
+  window["proxygl"] = res;
   return res;
 }
