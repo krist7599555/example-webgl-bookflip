@@ -29,11 +29,14 @@ export function serialize_gl_command(function_name: string, function_parameters:
     // @ts-ignore
     if (function_name in __UNSAFE_WEBGL2_FUNC_DEFINITION) {
       const arg = __UNSAFE_WEBGL2_FUNC_DEFINITION[function_name][i];
-      if (/GLint|GLfloat|GLboolean|GLuint|GLsize|GLsizei/.test(arg)) {
-        return v.toLocaleString();
-      }
       if (/GLenum/.test(arg) && NUM_TO_GLENUM.has(v)) {
         return NUM_TO_GLENUM.get(v)!;
+      }
+      if (/GLint|GLfloat|GLboolean|GLuint|GLsize|GLsizei/.test(arg)) {
+        return (v.toLocaleString() as string).replace(/,/g, '');
+      }
+      if (typeof v === 'number') {
+        return v.toLocaleString().replace(/,/g, '');
       }
       if (isTypedArray(v)) {
         const class_name =

@@ -32,10 +32,13 @@ export function test_book(canvas: HTMLCanvasElement) {
   };
   pgl.vertext_array.attributes.a_position.enabled = true;
 
+  // @ts-expect-error
+  window['gl'] = gl;
+  gl.clearColor(0.6, 0.8, 0.85, 1);
   animationFrames().subscribe(({ timestamp }) => {
-    gl.clearColor(0.6, 0.8, 0.85, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array([Math.sin(timestamp * 0.001)]));
     pgl.draw_array({ mode: 'TRIANGLES', count: 3 });
+    pgl.inspect = false;
   });
 }

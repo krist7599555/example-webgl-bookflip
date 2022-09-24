@@ -357,6 +357,13 @@ export function createProxyGLfromWebglProgram<
         return _inspect;
       },
       set inspect(enable: boolean) {
+        if (_inspect != enable) {
+          console.info(
+            enable
+              ? `${LOG_COLOR.fg.magenta}gl:${LOG_COLOR.reset} turn ${LOG_COLOR.fg.green}ON${LOG_COLOR.reset} inspector`
+              : `${LOG_COLOR.fg.magenta}gl:${LOG_COLOR.reset} turn ${LOG_COLOR.fg.red}OFF${LOG_COLOR.reset} inspector`
+          );
+        }
         _inspect = enable;
       },
       get program() {
