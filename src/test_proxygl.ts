@@ -7,7 +7,7 @@ import { Matrix3, Matrix4 } from "@math.gl/core";
 
 const vs = /*glsl*/ `#version 300 es
 #pragma vscode_glsllint_stage: vert
-// layout(location=0) in mat4 a_mvp;
+layout(location=0) in mat4 a_mvp;
 layout(location=4) in vec2 a_position;
 layout(location=5) in vec3 a_color;
 out vec3 v_color;
@@ -15,8 +15,15 @@ out vec3 v_color;
 void main() {
   gl_PointSize = 50.0;
   v_color = a_color;
-  // gl_Position = a_mvp * vec4(a_position, 0.0, 1.0);
-  gl_Position = vec4(a_position, 0.0, 1.0);
+  mat4 ar = a_mvp;
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      ar[i][j] = 0.0;
+    }
+    ar[i][i] = 1.0;
+  }
+  gl_Position = ar * vec4(a_position, 0.0, 1.0);
+  // gl_Position = vec4(a_position, 0.0, 1.0);
 }
 ` as const;
 
@@ -45,7 +52,7 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
 
   /* -------------------------------- SET DATA -------------------------------- */
 
-  const { a_position, a_color } = p.vertext_array.attributes;
+  const { a_position, a_color, a_mvp } = p.vertext_array.attributes;
   const sz_float = WEBGL_TYPE_TABLE.FLOAT.size_byte;
 
   p.array_buffer = gl.createBuffer("MyMainBuffer"); // internaly bind
@@ -65,17 +72,18 @@ export function test_proxygl(canvas: HTMLCanvasElement) {
   a_color.offset = sz_float * 2;
   a_color.stripe = sz_float * 5;
 
-  // p.array_buffer = null;
+  p.array_buffer = null;
 
-  // p.array_buffer = gl.createBuffer();
-  // p.array_buffer_data = new Float32Array([
-  //   ...new Matrix4().identity(),
-  //   ...new Matrix4().identity(),
-  // ]);
-  // a_mvp.enabled = true;
-  // a_mvp.stripe = sz_float * 4 * 4;
-  // a_mvp.offset = sz_float * 0;
-  // p.array_buffer = null;
+  p.array_buffer = gl.createBuffer();
+  p.array_buffer_data = new Float32Array([
+    ...new Matrix4().identity(),
+    ...new Matrix4().identity(),
+    ...new Matrix4().identity(),
+  ]);
+  a_mvp.enabled = true;
+  a_mvp.stripe = sz_float * 4 * 4;
+  a_mvp.offset = sz_float * 0;
+  p.array_buffer = null;
 
   /* ---------------------------------- DRAW ---------------------------------- */
 
