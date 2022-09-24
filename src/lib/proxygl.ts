@@ -1,59 +1,39 @@
-import { isArray, isNumber, isObject, isTypedArray, range, uniqueId } from 'lodash-es';
+import { isArray, isNumber, isTypedArray, range } from 'lodash-es';
 import { match } from 'ts-pattern';
 import { Simplify, TypedArray, ValueOf } from 'type-fest';
 
 import { InferAttribute, InferUniform } from './glsl_string_infer_type';
 import { assert, createProgram, createShader } from './krgl/helper';
+import { LOG_COLOR } from './log';
 import { gl_parameter_name, is_webgl_type, WEBGL_TYPE_TABLE, WebglType } from './sgl/helper';
-import { tf_keys } from './type-fest-runtime';
+import { serialize_gl_command } from './webgl2_serialize_command';
 
 type ActiveInfo = { size: number; type: WebglType };
 
-function _debug_gl(gl: WebGL2RenderingContext): WebGL2RenderingContext {
-  const reverse_gl_constant = new Map<number, `gl.${string}`>();
-  for (const key of tf_keys(gl)) {
-    const val = gl[key];
-    if (key == key.toUpperCase() && typeof val === 'number') {
-      reverse_gl_constant.set(val, `gl.${key}`);
-    }
+function __unsafe_inspect_webgl(
+  gl: WebGL2RenderingContext,
+  callback: {
+    enable: () => boolean;
+    listen_command: (...args: string[]) => void;
   }
-  function _strinify_arg(i: any) {
-    if (typeof i == 'number' && i > 10 && reverse_gl_constant.has(i)) {
-      return reverse_gl_constant.get(i);
-    }
-    if (i && typeof i == 'object' && typeof i[Symbol.iterator] == 'function') {
-      return JSON.stringify(Array.from(i));
-    }
-    return `${i}`;
-  }
-  WebGLBuffer.prototype.toString = function () {
-    return this.debug_id ? `[object WebGLBuffer(id=${this.debug_id})]` : `[object WebGLBuffer]`;
-  };
+): WebGL2RenderingContext {
+  assert(callback.enable);
+  assert(callback.listen_command);
+
   return new Proxy(gl, {
-    get(t, _p) {
-      assert(typeof _p == 'string');
-      const p = _p as keyof WebGL2RenderingContext;
-      try {
-        const o: any = Reflect.get(t, p, gl);
-        if (typeof o === 'function') {
-          return (...args: any[]) => {
-            const str_command = `gl.${p}(${args.map(_strinify_arg).join(', ')})`;
-            console.log('[DEUBGGL:CALL]', str_command);
-            const res = o.bind(gl)(...args);
-            if (p === 'createBuffer' && res instanceof WebGLBuffer) {
-              res.debug_id = typeof args[0] == 'string' ? args[0] : uniqueId('auto-');
-            }
-            if (res) {
-              console.log('[DEUBGGL:CALL]', str_command, '=', res);
-            }
-            return res;
-          };
-        }
-        return o;
-      } catch (err) {
-        console.log('[DEBUGGL:ERROR]', `gl.${p.toString()}`);
-        throw err;
+    get(t, p) {
+      assert(typeof p == 'string');
+      const o: any = Reflect.get(t, p, gl);
+      if (typeof o === 'number') return o;
+      if (typeof o === 'function') {
+        return (...args: any[]) => {
+          if (callback.enable()) {
+            callback.listen_command(serialize_gl_command(p, args));
+          }
+          return o.bind(gl)(...args);
+        };
       }
+      return o;
     },
   });
 }
@@ -64,7 +44,8 @@ export function createProxyGLfromShader<VS extends string, FS extends string>(op
   fragment_shader: FS;
 }) {
   const { canvas, vertex_shader: vs, fragment_shader: fs } = opt;
-  const gl = _debug_gl(canvas.getContext('webgl2')!);
+  // assign debug gl here
+  const gl = canvas.getContext('webgl2')!;
   const program = createProgram(
     gl,
     createShader(gl, gl.VERTEX_SHADER, vs.trim())!,
@@ -87,6 +68,23 @@ export function createProxyGLfromWebglProgram<
 >(gl: WebGL2RenderingContext, program: WebGLProgram) {
   gl.useProgram(program);
 
+  let _inspect = false;
+  gl = __unsafe_inspect_webgl(gl, {
+    enable: () => _inspect,
+    listen_command(...cmd) {
+      console.log(
+        ...cmd.map(c => {
+          return c
+            .replace(/(gl\.[A-Z_]+)/g, `${LOG_COLOR.fg.green}$1${LOG_COLOR.reset}`)
+            .replace(/(gl\.[a-z][a-zA-Z_]+)/g, `${LOG_COLOR.fg.magenta}$1${LOG_COLOR.reset}`)
+            .replace(
+              /(true|false|undefined|null|\[object WebGL.*\]| [A-Za-z0-9]+Array)/g,
+              `${LOG_COLOR.fg.blue}$1${LOG_COLOR.reset}`
+            );
+        })
+      );
+    },
+  });
   type VAOAttrProxy = {
     [key in keyof T['attributes']]: {
       /**
@@ -354,26 +352,25 @@ export function createProxyGLfromWebglProgram<
       get gl() {
         return gl;
       },
+      /** allow to inspect gl behavior */
+      get inspect() {
+        return _inspect;
+      },
+      set inspect(enable: boolean) {
+        _inspect = enable;
+      },
       get program() {
         return program;
       },
       array_buffer: null as WebGLBuffer | null,
-      set array_buffer_data(
-        opt:
-          | TypedArray
-          | {
-              data: TypedArray;
-              usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
-              offset?: number;
-              length?: number;
-            }
-      ) {
+      set array_buffer_data(opt: {
+        data: TypedArray;
+        usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
+        offset?: number;
+        length?: number;
+      }) {
         assert(res.array_buffer);
-        const [data, usage = 'STATIC_DRAW', offset = undefined, length = undefined] =
-          isObject(opt) && 'data' in opt
-            ? [opt.data, opt.usage ?? ('STATIC_DRAW' as const), opt.offset, opt.length]
-            : [opt, 'STATIC_DRAW' as const, 0];
-
+        const { data, usage = 'STATIC_DRAW', offset = 0, length = undefined } = opt;
         gl.bufferData(gl.ARRAY_BUFFER, data, gl[usage], offset ?? 0, length);
       },
       get vertext_array() {
