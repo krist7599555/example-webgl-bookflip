@@ -1,4 +1,5 @@
 <script lang="ts">
+import { range } from 'lodash-es';
 import { animationFrames } from 'rxjs';
 import { onMount } from 'svelte';
 
@@ -32,6 +33,17 @@ async function scale_image(
   return canvas;
 }
 
+function gen_paper_mesh(w: number, h: number) {
+  const verties = range(h + 1).flatMap(i => range(w + 1).flatMap(j => [i / h, j / w]));
+  const indices = range(h).flatMap(i =>
+    range(w).flatMap(j => {
+      const idx = i * (w + 1) + j;
+      return [idx, idx + 1, idx + h + 1, idx + 1, idx + h + 1, idx + h + 2];
+    })
+  );
+  return { verties, indices };
+}
+
 onMount(async () => {
   canvas.width = 800;
   canvas.height = 800;
@@ -61,24 +73,9 @@ onMount(async () => {
       }`,
   });
 
-  const img1 = new ImageData(
-    new Uint8ClampedArray([
-      255, 155, 100, 255, 55, 155, 100, 255, 0, 0, 100, 255, 100, 0, 100, 255,
-    ]),
-    2,
-    2
-  );
-  const img3 = new ImageData(
-    new Uint8ClampedArray([0, 0, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255, 100, 0, 0, 255]),
-    2,
-    2
-  );
-  const img2 = new ImageData(
-    new Uint8ClampedArray([255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255, 100, 0, 0, 255]),
-    2,
-    2
-  );
-  const img4 = await load_image('texture-4.png');
+  const img1 = await load_image('texture-1.png');
+  const img2 = await load_image('texture-2.png');
+  const img3 = await load_image('texture-3.png');
 
   const gl = pgl.gl;
   pgl.inspect = true;
@@ -86,62 +83,57 @@ onMount(async () => {
   gl.TEXTURE_2D_ARRAY;
   const TEXTURE_IMG1_IDX = 1;
 
-  const sz = 2;
+  const sz = 300;
 
   pgl.texture_active_index = TEXTURE_IMG1_IDX;
   pgl.texture_2d_array = gl.createTexture();
   pgl.texture_2d_array_
     .minmag('NEAREST')
-    .tex_storage_3D_builder(sz, sz, 4)
+    .tex_storage_3D_builder(sz, sz, 3)
     .set_texture(0, await scale_image(img1, sz, sz))
     .set_texture(1, await scale_image(img2, sz, sz))
-    .set_texture(2, await scale_image(img3, sz, sz))
-    .set_texture(3, await scale_image(img4, sz, sz));
+    .set_texture(2, await scale_image(img3, sz, sz));
 
   pgl.uniforms.u_textures.data = [TEXTURE_IMG1_IDX];
 
   // @ts-expect-error
   window['gl'] = gl;
-  pgl.inspect = false;
+  pgl.inspect = true;
 
+  const paper = gen_paper_mesh(10, 10);
   {
     const { a_position, a_uv } = pgl.vertext_array.attributes;
 
     pgl.array_buffer_.bind(gl.createBuffer()).data({
-      data: new Float32Array([
-        ...[-0.5, -0.2, 0, 0],
-        ...[0.7, -0.5, 0, 1],
-        ...[0.6, 0.4, 1, 1],
-        ...[-0.5, 0.7, 1, 0],
-      ]),
+      data: new Float32Array(paper.verties),
     });
 
     a_position.enabled = true;
     a_position.offset = 0;
-    a_position.stripe = BYTE.vec2 + BYTE.vec2;
+    a_position.stripe = BYTE.vec2;
 
     a_uv.enabled = true;
-    a_uv.offset = BYTE.vec2;
-    a_uv.stripe = BYTE.vec2 + BYTE.vec2;
+    a_uv.offset = 0;
+    a_uv.stripe = BYTE.vec2;
     pgl.array_buffer = null;
   }
 
   {
     pgl.vertext_array.element_array_buffer = gl.createBuffer();
     pgl.vertext_array.element_array_buffer_.data({
-      data: new Uint16Array([0, 1, 2, 2, 3, 0]),
+      data: new Uint16Array(paper.indices),
     });
   }
 
   gl.clearColor(0.6, 0.8, 0.85, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
   animationFrames().subscribe(({ timestamp: t }) => {
-    pgl.uniforms.u_texture_index.data = [Math.round(t * 0.005) % 4];
+    pgl.uniforms.u_texture_index.data = [Math.round(t * 0.005) % 3];
     pgl.draw_element({
       mode: 'TRIANGLES',
-      count: 6,
+      count: paper.indices.length,
     });
-    // pgl.inspect = false;
+    pgl.inspect = false;
   });
 });
 </script>

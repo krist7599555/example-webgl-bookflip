@@ -9,6 +9,13 @@ import { gl_parameter_name, is_webgl_type, WEBGL_TYPE_TABLE, WebglType } from '.
 import { serialize_gl_command } from './webgl2_serialize_command';
 
 type ActiveInfo = { size: number; type: WebglType };
+type GlEnumDrawMode =
+  | 'TRIANGLES'
+  | 'POINTS'
+  | 'LINES'
+  | 'LINE_STRIP'
+  | 'TRIANGLE_STRIP'
+  | 'TRIANGLE_FAN';
 
 function __unsafe_inspect_webgl(
   gl: WebGL2RenderingContext,
@@ -552,18 +559,18 @@ export function createProxyGLfromWebglProgram<
       get uniforms() {
         return uniforms;
       },
-      draw_array(opt: { mode: 'TRIANGLES' | 'POINTS'; count: number; first?: number }) {
+      draw_array(opt: { mode: GlEnumDrawMode; count: number; first?: number }) {
         gl.drawArrays(gl[opt.mode], opt.first ?? 0, opt.count);
       },
       draw_array_instanced(opt: {
-        mode: 'TRIANGLES' | 'POINTS';
+        mode: GlEnumDrawMode;
         count: number;
         instance_count: number;
         first?: number;
       }) {
         gl.drawArraysInstanced(gl[opt.mode], opt.first ?? 0, opt.count, opt.instance_count);
       },
-      draw_element(opt: { mode: 'TRIANGLES' | 'POINTS'; count: number; offset?: number }) {
+      draw_element(opt: { mode: GlEnumDrawMode; count: number; offset?: number }) {
         assert(res.vertext_array.element_array_buffer);
         assert(res.vertext_array.element_array_buffer_.index_type);
         gl.drawElements(
@@ -574,7 +581,7 @@ export function createProxyGLfromWebglProgram<
         );
       },
       draw_element_instanced(opt: {
-        mode: 'TRIANGLES' | 'POINTS';
+        mode: GlEnumDrawMode;
         count: number;
         instance_count: number;
         offset?: number;
