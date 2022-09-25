@@ -1,4 +1,4 @@
-import { isArray, isNumber, isTypedArray, range } from 'lodash-es';
+import { isArray, isNumber, isObject, isTypedArray, range } from 'lodash-es';
 import { match } from 'ts-pattern';
 import { Simplify, TypedArray, ValueOf } from 'type-fest';
 
@@ -339,11 +339,52 @@ export function createProxyGLfromWebglProgram<
       get attributes() {
         return vertext_array_attribute_proxy;
       },
+      element_array_buffer: null as WebGLBuffer | null,
+      element_array_buffer_data: null as {
+        data: Uint32Array | Uint16Array | Uint8Array;
+        usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
+      } | null,
+      get element_array_buffer_data__type() {
+        if (!this.element_array_buffer_data) return null;
+        if (this.element_array_buffer_data.data instanceof Uint8Array)
+          return 'UNSIGNED_BYTE' as const;
+        if (this.element_array_buffer_data.data instanceof Uint16Array)
+          return 'UNSIGNED_SHORT' as const;
+        if (this.element_array_buffer_data.data instanceof Uint32Array)
+          return 'UNSIGNED_INT' as const;
+        throw new Error('element_array_buffer_data__type not match any type');
+      },
     },
     {
-      // get(t, f) {
-      //   return deproxy_get(t, f);
-      // },
+      set(t, p, val) {
+        if (p === 'element_array_buffer_data__type') return false;
+        if (p === 'element_array_buffer') {
+          console.log('ELEMNT AAR', p, val);
+          if (p === null || val instanceof WebGLBuffer) {
+            t.element_array_buffer = val;
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, val);
+            return true;
+          } else {
+            console.log(val, 'is not buffer');
+            return false;
+          }
+        }
+        if (p === 'element_array_buffer_data') {
+          type A = typeof t['element_array_buffer_data'];
+          const val2 = val as A;
+          if (val2 == null) {
+            throw new Error('element_array_buffer_data not allow set data to null');
+            return false;
+          }
+          if (isObject(val2)) {
+            t.element_array_buffer_data = val2;
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, val2.data, gl[val2.usage ?? 'STATIC_DRAW']);
+            return true;
+          }
+          return false;
+        }
+        return Reflect.set(t, p, val);
+      },
     }
   );
 
@@ -387,7 +428,7 @@ export function createProxyGLfromWebglProgram<
         return uniforms;
       },
       draw_array(opt: { mode: 'TRIANGLES' | 'POINTS'; count: number; first?: number }) {
-        gl.drawArrays(gl[opt.mode], opt.first ?? 0, opt.count);
+        gl.drawArrays(gl[opt.mode], opt.first ?? 0, opt.count ?? res.array_buffer_data.length);
       },
       draw_array_instanced(opt: {
         mode: 'TRIANGLES' | 'POINTS';
@@ -396,6 +437,34 @@ export function createProxyGLfromWebglProgram<
         first?: number;
       }) {
         gl.drawArraysInstanced(gl[opt.mode], opt.first ?? 0, opt.count, opt.instance_count);
+      },
+      draw_element(opt: { mode: 'TRIANGLES' | 'POINTS'; count: number; offset?: number }) {
+        assert(res.vertext_array.element_array_buffer_data);
+        assert(res.vertext_array.element_array_buffer_data.data.length >= opt.count);
+        assert(res.vertext_array.element_array_buffer_data__type);
+        gl.drawElements(
+          gl[opt.mode],
+          opt.count,
+          gl[res.vertext_array.element_array_buffer_data__type],
+          opt.offset ?? 0
+        );
+      },
+      draw_element_instanced(opt: {
+        mode: 'TRIANGLES' | 'POINTS';
+        count: number;
+        instance_count: number;
+        offset?: number;
+      }) {
+        assert(res.vertext_array.element_array_buffer_data);
+        assert(res.vertext_array.element_array_buffer_data__type);
+        assert(res.vertext_array.element_array_buffer_data.length >= opt.count);
+        gl.drawElementsInstanced(
+          gl[opt.mode],
+          opt.count ?? 0,
+          gl[res.vertext_array.element_array_buffer_data__type],
+          opt.offset ?? 0,
+          opt.instance_count
+        );
       },
     },
     {
