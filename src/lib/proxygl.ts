@@ -1,4 +1,4 @@
-import { isArray, isNumber, isTypedArray, range } from 'lodash-es';
+import { isArray, isInteger, isNumber, isTypedArray, range } from 'lodash-es';
 import { match } from 'ts-pattern';
 import { Simplify, TypedArray, ValueOf } from 'type-fest';
 
@@ -203,6 +203,7 @@ export function createProxyGLfromWebglProgram<
               .with("FLOAT_MAT4x3", () => gl.uniformMatrix4x3fv(target.location, false, nums))
               .with("FLOAT_MAT4", () => gl.uniformMatrix4fv(target.location, false, nums))
               .with("SAMPLER_2D", () => gl.uniform1iv(target.location, nums))
+              .with("SAMPLER_2D_ARRAY", () => gl.uniform1iv(target.location, nums))
               //@ts-expect-error
               .exhaustive()
             target.data = nums;
@@ -449,18 +450,22 @@ export function createProxyGLfromWebglProgram<
       },
       /** bind to current texture_2d_active_index */
       texture_2d: null as WebGLTexture | null,
-      /** will call @type {gl.activeTexture} */
-      texture_2d_active_index: 0,
+      texture_2d_array: null as WebGLTexture | null,
+      /** should call before se texture_2d/texture_2d_array async with @type {gl.ACTIVE_TEXTURE}  @type {gl.activeTexture} */
+      get texture_active_index() {
+        return gl.getParameter(gl.ACTIVE_TEXTURE) - gl.TEXTURE0;
+      },
+      set texture_active_index(texture_index: number) {
+        assert(
+          isInteger(texture_index) && texture_index < 32,
+          `gl.activeTexture(gl.TEXTURE0 + $1); require $1 < 32; got $1 = ${texture_index}`
+        );
+        gl.activeTexture(gl.TEXTURE0 + texture_index);
+      },
       get texture_2d_() {
         return {
           bind(texture: WebGLTexture | null) {
             res.texture_2d = texture;
-            return this;
-          },
-          /** `gl.activeTexture($1)` */
-          active(idx: number) {
-            assert(gl.TEXTURE0 + 15 === gl.TEXTURE15); // magic wewbgl
-            res.texture_2d_active_index = idx;
             return this;
           },
           /** `gl.texImage2D(TEXTURE_2D, 0, RGBA, RGBA, UNSIGNED_BYTE, $1)` */
@@ -494,6 +499,49 @@ export function createProxyGLfromWebglProgram<
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl[opt]);
             gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl[opt]);
             return this;
+          },
+        };
+      },
+      get texture_2d_array_() {
+        return {
+          /** `gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S/T`, $1) */
+          wrap(opt: 'REPEAT' | 'CLAMP_TO_EDGE' | 'MIRRORED_REPEAT') {
+            assert(res.texture_2d_array);
+            gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_S, gl[opt]);
+            gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_WRAP_T, gl[opt]);
+            return this;
+          },
+          /** `gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN/MAG_FILTER`, $1) */
+          minmag(opt: 'NEAREST' | 'LINEAR' | 'NEAREST_MIPMAP_LINEAR') {
+            assert(res.texture_2d_array);
+            gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MIN_FILTER, gl[opt]);
+            gl.texParameteri(gl.TEXTURE_2D_ARRAY, gl.TEXTURE_MAG_FILTER, gl[opt]);
+            return this;
+          },
+          tex_storage_3D_builder(width: number, height: number, total_depth: number) {
+            gl.texStorage3D(gl.TEXTURE_2D_ARRAY, 1, gl.RGBA8, width, height, total_depth);
+            return {
+              set_texture(depth: number, image: TexImageSource) {
+                assert(
+                  0 <= depth && depth < total_depth,
+                  `gl.texSubImage3D depth = ${depth} outof gl.texStorage3D size which is ${total_depth}`
+                );
+                gl.texSubImage3D(
+                  gl.TEXTURE_2D_ARRAY,
+                  0,
+                  0,
+                  0,
+                  depth,
+                  width,
+                  height,
+                  1,
+                  gl.RGBA,
+                  gl.UNSIGNED_BYTE,
+                  image
+                );
+                return this;
+              },
+            };
           },
         };
       },
@@ -555,10 +603,9 @@ export function createProxyGLfromWebglProgram<
           assert(new_val === null || new_val instanceof WebGLTexture);
           gl.bindTexture(gl.TEXTURE_2D, new_val);
         }
-        if (field == 'texture_2d_active_index') {
-          assert(typeof new_val == 'number');
-          assert(gl.TEXTURE0 + 15 === gl.TEXTURE15); // magic wewbgl
-          gl.activeTexture(gl.TEXTURE0 + new_val);
+        if (field == 'texture_2d_array') {
+          assert(new_val === null || new_val instanceof WebGLTexture);
+          gl.bindTexture(gl.TEXTURE_2D_ARRAY, new_val);
         }
         return Reflect.set(target, field, new_val, old_val);
       },

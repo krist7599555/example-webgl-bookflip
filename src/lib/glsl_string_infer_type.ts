@@ -2,6 +2,7 @@
 import type { Split, Trim } from 'type-fest';
 
 type Minitype = {
+  int: 'INT';
   float: 'FLOAT';
   vec2: 'FLOAT_VEC2';
   vec3: 'FLOAT_VEC3';
@@ -11,6 +12,7 @@ type Minitype = {
   mat4: 'FLOAT_MAT4';
   bool: 'BOOL';
   sampler2D: 'SAMPLER_2D';
+  sampler2DArray: 'SAMPLER_2D_ARRAY';
 };
 
 type InferAttributeLine<T extends string> = T extends `${
@@ -40,6 +42,8 @@ export type InferUniform<T extends string> = {
 };
 
 type _TEST_TEXTURE_A0 = InferUniformLine<'uniform sampler2D u_texture;'>;
+type _TEST_TEXTURE_A3 = InferUniformLine<'uniform sampler2DArray u_textures;'>;
+type _TEST_TEXTURE_A5 = InferUniformLine<'uniform int u_texture_index;'>;
 type _TEST_TEXTURE_A1 = InferUniform</*glsl*/ `#version 300 es
 #pragma vscode_glsllint_stage: frag
 precision mediump float;
@@ -49,3 +53,9 @@ out vec4 o_color;
 void main() {
   o_color = texture(u_texture, v_uv);
 }`>;
+type _TEST_TEXTURE_A4 = InferUniform</*glsl*/ `precision mediump float;
+precision mediump sampler2DArray;
+
+uniform sampler2DArray u_textures;
+uniform int u_texture_index;
+in vec2 v_uv;`>;

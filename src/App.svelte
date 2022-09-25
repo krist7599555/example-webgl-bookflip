@@ -1,4 +1,5 @@
 <script lang="ts">
+import { animationFrames } from 'rxjs';
 import { onMount } from 'svelte';
 
 import { BYTE } from './lib/byte';
@@ -12,6 +13,23 @@ async function load_image(src: string): Promise<HTMLImageElement> {
     m.src = src;
     m.onload = () => resolve(m);
   });
+}
+async function scale_image(
+  image: HTMLImageElement | ImageBitmap | ImageData | Blob,
+  width: number,
+  height: number
+): Promise<HTMLCanvasElement> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d')!;
+  const pure_image =
+    image instanceof ImageData || image instanceof Blob ? await createImageBitmap(image) : image;
+  ctx.drawImage(pure_image, 0, 0, width, height);
+  document.body.append(canvas);
+  canvas.style.minWidth = '30vw';
+  canvas.style.minHeight = '30vh';
+  return canvas;
 }
 
 onMount(async () => {
@@ -32,11 +50,14 @@ onMount(async () => {
     fragment_shader: /*glsl*/ `#version 300 es
       #pragma vscode_glsllint_stage: frag
       precision mediump float;
-      uniform sampler2D u_texture;
+      precision mediump sampler2DArray;
+
+      uniform sampler2DArray u_textures;
+      uniform int u_texture_index;
       in vec2 v_uv;
       out vec4 o_color;
       void main() {
-        o_color = texture(u_texture, v_uv);
+        o_color = texture(u_textures, vec3(v_uv, u_texture_index));
       }`,
   });
 
@@ -47,19 +68,37 @@ onMount(async () => {
     2,
     2
   );
-  const img2 = await load_image('texture-1.png');
+  const img3 = new ImageData(
+    new Uint8ClampedArray([0, 0, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255, 100, 0, 0, 255]),
+    2,
+    2
+  );
+  const img2 = new ImageData(
+    new Uint8ClampedArray([255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255, 100, 0, 0, 255]),
+    2,
+    2
+  );
+  const img4 = await load_image('texture-4.png');
 
   const gl = pgl.gl;
   pgl.inspect = true;
 
-  const TEXTURE_IMG1_IDX = 0;
-  pgl.uniforms.u_texture.data = new Uint8Array([TEXTURE_IMG1_IDX]);
-  pgl.texture_2d_
-    .active(TEXTURE_IMG1_IDX)
-    .flip_y(true)
-    .bind(gl.createTexture())
-    .data({ data: img1 })
-    .minmag('NEAREST');
+  gl.TEXTURE_2D_ARRAY;
+  const TEXTURE_IMG1_IDX = 1;
+
+  const sz = 2;
+
+  pgl.texture_active_index = TEXTURE_IMG1_IDX;
+  pgl.texture_2d_array = gl.createTexture();
+  pgl.texture_2d_array_
+    .minmag('NEAREST')
+    .tex_storage_3D_builder(sz, sz, 4)
+    .set_texture(0, await scale_image(img1, sz, sz))
+    .set_texture(1, await scale_image(img2, sz, sz))
+    .set_texture(2, await scale_image(img3, sz, sz))
+    .set_texture(3, await scale_image(img4, sz, sz));
+
+  pgl.uniforms.u_textures.data = [TEXTURE_IMG1_IDX];
 
   // @ts-expect-error
   window['gl'] = gl;
@@ -96,14 +135,14 @@ onMount(async () => {
 
   gl.clearColor(0.6, 0.8, 0.85, 1);
   gl.clear(gl.COLOR_BUFFER_BIT);
-  pgl.draw_element({
-    mode: 'TRIANGLES',
-    count: 6,
+  animationFrames().subscribe(({ timestamp: t }) => {
+    pgl.uniforms.u_texture_index.data = [Math.round(t * 0.005) % 4];
+    pgl.draw_element({
+      mode: 'TRIANGLES',
+      count: 6,
+    });
+    // pgl.inspect = false;
   });
-  // animationFrames().subscribe(({ timestamp: _t }) => {
-
-  //   pgl.inspect = false;
-  // });
 });
 </script>
 
