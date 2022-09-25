@@ -75,8 +75,8 @@ export function createProxyGLfromWebglProgram<
       console.log(
         ...cmd.map(c => {
           return c
-            .replace(/(gl\.[A-Z_]+)/g, `${LOG_COLOR.fg.green}$1${LOG_COLOR.reset}`)
-            .replace(/(gl\.[a-z][a-zA-Z_]+)/g, `${LOG_COLOR.fg.magenta}$1${LOG_COLOR.reset}`)
+            .replace(/(gl\.[A-Z_][A-Z_0-9]+)/g, `${LOG_COLOR.fg.green}$1${LOG_COLOR.reset}`)
+            .replace(/(gl\.[a-z][a-zA-Z_0-9]+)/g, `${LOG_COLOR.fg.magenta}$1${LOG_COLOR.reset}`)
             .replace(
               /(true|false|undefined|null|\[object WebGL.*\]| [A-Za-z0-9]+Array)/g,
               `${LOG_COLOR.fg.blue}$1${LOG_COLOR.reset}`
@@ -163,6 +163,7 @@ export function createProxyGLfromWebglProgram<
   ).reduce((acc, i) => {
     const info = gl.getActiveUniform(program, i)!;
     const str_type = gl_parameter_name(gl, info.type);
+    console.log(str_type);
     assert(is_webgl_type(str_type));
     const new_uniform: ValueOf<UniformProxy> = new Proxy(
       {

@@ -28,6 +28,7 @@ export const WEBGL_TYPE_TABLE = {
   "FLOAT_MAT4x2":      { base_type: "FLOAT",        base_type_byte: 4, element_count: 4*2, size_byte: 4 * (4*2) },
   "FLOAT_MAT4x3":      { base_type: "FLOAT",        base_type_byte: 4, element_count: 4*3, size_byte: 4 * (4*3) },
   "FLOAT_MAT4":        { base_type: "FLOAT",        base_type_byte: 4, element_count: 4*4, size_byte: 4 * (4*4) },
+  "SAMPLER_2D":        { base_type: "SAMPLER_2D" } as never
 } as const;
 export type WebglType = keyof typeof WEBGL_TYPE_TABLE;
 export type WebglBaseType = typeof WEBGL_TYPE_TABLE[WebglType]['base_type'];

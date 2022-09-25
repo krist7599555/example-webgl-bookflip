@@ -10,6 +10,7 @@ type Minitype = {
   mat3: 'FLOAT_MAT3';
   mat4: 'FLOAT_MAT4';
   bool: 'BOOL';
+  sampler2D: 'SAMPLER_2D';
 };
 
 type InferAttributeLine<T extends string> = T extends `${
@@ -37,3 +38,14 @@ export type InferAttribute<T extends string> = {
 export type InferUniform<T extends string> = {
   [key in Trim<Split<T, '\n'>[number]> as InferUniformLine<key>['name']]: InferUniformLine<key>;
 };
+
+type _TEST_TEXTURE_A0 = InferUniformLine<'uniform sampler2D u_texture;'>;
+type _TEST_TEXTURE_A1 = InferUniform</*glsl*/ `#version 300 es
+#pragma vscode_glsllint_stage: frag
+precision mediump float;
+uniform sampler2D u_texture;
+in vec2 v_uv;
+out vec4 o_color;
+void main() {
+  o_color = texture(u_texture, v_uv);
+}`>;
