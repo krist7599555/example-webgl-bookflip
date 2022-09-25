@@ -40,37 +40,27 @@ onMount(async () => {
       }`,
   });
 
+  const img1 = new ImageData(
+    new Uint8ClampedArray([
+      255, 155, 100, 255, 55, 155, 100, 255, 0, 0, 100, 255, 100, 0, 100, 255,
+    ]),
+    2,
+    2
+  );
+  const img2 = await load_image('texture-1.png');
+
   const gl = pgl.gl;
   pgl.inspect = true;
-  const texture = gl.createTexture();
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.uniform1i(pgl.uniforms.u_texture.location, 0);
-  gl.texImage2D(
-    gl.TEXTURE_2D,
-    0,
-    gl.RGBA,
-    // 2,
-    // 2,
-    // 0,
-    gl.RGBA,
-    gl.UNSIGNED_BYTE,
-    new ImageData(
-      new Uint8ClampedArray([
-        255, 155, 100, 255, 55, 155, 100, 255, 0, 0, 100, 255, 100, 0, 100, 255,
-      ]),
-      2,
-      2
-    )
-    // await load_image('texture-1.png')
-  );
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  // gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.GL_NEAREST_MIPMAP_LINEAR);
 
-  // pgl.uniforms.
+  const TEXTURE_IMG1_IDX = 0;
+  pgl.uniforms.u_texture.data = new Uint8Array([TEXTURE_IMG1_IDX]);
+  pgl.texture_2d_
+    .active(TEXTURE_IMG1_IDX)
+    .flip_y(true)
+    .bind(gl.createTexture())
+    .data({ data: img1 })
+    .minmag('NEAREST');
+
   // @ts-expect-error
   window['gl'] = gl;
   pgl.inspect = false;
@@ -78,8 +68,7 @@ onMount(async () => {
   {
     const { a_position, a_uv } = pgl.vertext_array.attributes;
 
-    pgl.array_buffer = gl.createBuffer();
-    pgl.array_buffer_.data({
+    pgl.array_buffer_.bind(gl.createBuffer()).data({
       data: new Float32Array([
         ...[-0.5, -0.2, 0, 0],
         ...[0.7, -0.5, 0, 1],
@@ -87,6 +76,7 @@ onMount(async () => {
         ...[-0.5, 0.7, 1, 0],
       ]),
     });
+
     a_position.enabled = true;
     a_position.offset = 0;
     a_position.stripe = BYTE.vec2 + BYTE.vec2;

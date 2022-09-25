@@ -202,6 +202,7 @@ export function createProxyGLfromWebglProgram<
               .with("FLOAT_MAT4x2", () => gl.uniformMatrix4x2fv(target.location, false, nums))
               .with("FLOAT_MAT4x3", () => gl.uniformMatrix4x3fv(target.location, false, nums))
               .with("FLOAT_MAT4", () => gl.uniformMatrix4fv(target.location, false, nums))
+              .with("SAMPLER_2D", () => gl.uniform1iv(target.location, nums))
               //@ts-expect-error
               .exhaustive()
             target.data = nums;
@@ -413,8 +414,12 @@ export function createProxyGLfromWebglProgram<
       },
       array_buffer: null as WebGLBuffer | null,
       get array_buffer_() {
-        assert(res.array_buffer);
         return {
+          // alias for `.array_buffer = $1`
+          bind(array_buffer: WebGLBuffer | null) {
+            res.array_buffer = array_buffer;
+            return this;
+          },
           /** @proxy @type {gl.bufferData} */
           data({
             data,
@@ -442,6 +447,57 @@ export function createProxyGLfromWebglProgram<
         const { data, usage = 'STATIC_DRAW', offset = 0, length = undefined } = opt;
         gl.bufferData(gl.ARRAY_BUFFER, data, gl[usage], offset ?? 0, length);
       },
+      /** bind to current texture_2d_active_index */
+      texture_2d: null as WebGLTexture | null,
+      /** will call @type {gl.activeTexture} */
+      texture_2d_active_index: 0,
+      get texture_2d_() {
+        return {
+          bind(texture: WebGLTexture | null) {
+            res.texture_2d = texture;
+            return this;
+          },
+          /** `gl.activeTexture($1)` */
+          active(idx: number) {
+            assert(gl.TEXTURE0 + 15 === gl.TEXTURE15); // magic wewbgl
+            res.texture_2d_active_index = idx;
+            return this;
+          },
+          /** `gl.texImage2D(TEXTURE_2D, 0, RGBA, RGBA, UNSIGNED_BYTE, $1)` */
+          data(opt: {
+            data: ImageBitmap | ImageData | HTMLImageElement | HTMLCanvasElement | HTMLVideoElement;
+          }) {
+            assert(res.texture_2d);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, opt.data);
+            this.minmag('LINEAR');
+            this.wrap('REPEAT');
+            return this;
+          },
+          /** must call before call @type {gl.texImage2D} to take effect
+           * `gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, $1)`
+           */
+          flip_y(flip: boolean) {
+            assert(!res.texture_2d, 'must call before call @type {gl.texImage2D} to take effect');
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flip);
+            return this;
+          },
+          /** `gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S/T`, $1) */
+          wrap(opt: 'REPEAT' | 'CLAMP_TO_EDGE' | 'MIRRORED_REPEAT') {
+            assert(res.texture_2d);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl[opt]);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl[opt]);
+            return this;
+          },
+          /** `gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN/MAG_FILTER`, $1) */
+          minmag(opt: 'NEAREST' | 'LINEAR' | 'NEAREST_MIPMAP_LINEAR') {
+            assert(res.texture_2d);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl[opt]);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl[opt]);
+            return this;
+          },
+        };
+      },
+
       get vertext_array() {
         return vertext_array;
       },
@@ -449,7 +505,7 @@ export function createProxyGLfromWebglProgram<
         return uniforms;
       },
       draw_array(opt: { mode: 'TRIANGLES' | 'POINTS'; count: number; first?: number }) {
-        gl.drawArrays(gl[opt.mode], opt.first ?? 0, opt.count ?? res.array_buffer_data.length);
+        gl.drawArrays(gl[opt.mode], opt.first ?? 0, opt.count);
       },
       draw_array_instanced(opt: {
         mode: 'TRIANGLES' | 'POINTS';
@@ -494,6 +550,15 @@ export function createProxyGLfromWebglProgram<
         if (field == 'array_buffer') {
           assert(new_val === null || new_val instanceof WebGLBuffer);
           gl.bindBuffer(gl.ARRAY_BUFFER, new_val);
+        }
+        if (field == 'texture_2d') {
+          assert(new_val === null || new_val instanceof WebGLTexture);
+          gl.bindTexture(gl.TEXTURE_2D, new_val);
+        }
+        if (field == 'texture_2d_active_index') {
+          assert(typeof new_val == 'number');
+          assert(gl.TEXTURE0 + 15 === gl.TEXTURE15); // magic wewbgl
+          gl.activeTexture(gl.TEXTURE0 + new_val);
         }
         return Reflect.set(target, field, new_val, old_val);
       },
