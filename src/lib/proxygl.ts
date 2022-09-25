@@ -1,4 +1,4 @@
-import { isArray, isNumber, isObject, isTypedArray, range } from 'lodash-es';
+import { isArray, isNumber, isTypedArray, range } from 'lodash-es';
 import { match } from 'ts-pattern';
 import { Simplify, TypedArray, ValueOf } from 'type-fest';
 
@@ -123,7 +123,7 @@ export function createProxyGLfromWebglProgram<
       /**
        * @proxy @type {gl.bindData}
        **/
-      buffer: any;
+      buffer: WebGLBuffer | null;
       /**
        * @proxy @type {gl.vertexAttribDivisor}
        * @default 0
@@ -259,6 +259,8 @@ export function createProxyGLfromWebglProgram<
         },
         update_vertex_attrib_pointer() {
           const base_type = WEBGL_TYPE_TABLE[a.type].base_type;
+          assert(res.array_buffer, 'need to bind gl.ARRAY_BUFFER to call gl.vertexAttribPointer. ');
+          this.buffer = res.array_buffer; // ! assign from current array_buffer
           assert(base_type == 'FLOAT');
           const base_type_i = gl[base_type];
           for (const o of this._loc_and_offset) {
@@ -340,48 +342,46 @@ export function createProxyGLfromWebglProgram<
         return vertext_array_attribute_proxy;
       },
       element_array_buffer: null as WebGLBuffer | null,
-      element_array_buffer_data: null as {
-        data: Uint32Array | Uint16Array | Uint8Array;
-        usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
-      } | null,
-      get element_array_buffer_data__type() {
-        if (!this.element_array_buffer_data) return null;
-        if (this.element_array_buffer_data.data instanceof Uint8Array)
-          return 'UNSIGNED_BYTE' as const;
-        if (this.element_array_buffer_data.data instanceof Uint16Array)
-          return 'UNSIGNED_SHORT' as const;
-        if (this.element_array_buffer_data.data instanceof Uint32Array)
-          return 'UNSIGNED_INT' as const;
-        throw new Error('element_array_buffer_data__type not match any type');
+      element_array_buffer__private_index_type: null as
+        | null
+        | 'UNSIGNED_BYTE'
+        | 'UNSIGNED_SHORT'
+        | 'UNSIGNED_INT',
+      get element_array_buffer_() {
+        assert(vertext_array.element_array_buffer);
+        return {
+          data(opt: {
+            data: Uint32Array | Uint16Array | Uint8Array;
+            usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
+          }) {
+            assert(vertext_array.element_array_buffer);
+            vertext_array.element_array_buffer__private_index_type =
+              (
+                [
+                  [Uint8Array, 'UNSIGNED_BYTE'],
+                  [Uint16Array, 'UNSIGNED_SHORT'],
+                  [Uint32Array, 'UNSIGNED_INT'],
+                ] as const
+              ).find(f => opt.data instanceof f[0])?.[1] ?? null;
+
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, opt.data, gl[opt.usage ?? 'STATIC_DRAW']);
+          },
+          get index_type() {
+            assert(vertext_array.element_array_buffer);
+            return vertext_array.element_array_buffer__private_index_type;
+          },
+        };
       },
     },
     {
       set(t, p, val) {
-        if (p === 'element_array_buffer_data__type') return false;
+        // if (typeof p === 'string' && p.includes('private')) return false;
         if (p === 'element_array_buffer') {
-          console.log('ELEMNT AAR', p, val);
           if (p === null || val instanceof WebGLBuffer) {
-            t.element_array_buffer = val;
             gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, val);
-            return true;
           } else {
-            console.log(val, 'is not buffer');
             return false;
           }
-        }
-        if (p === 'element_array_buffer_data') {
-          type A = typeof t['element_array_buffer_data'];
-          const val2 = val as A;
-          if (val2 == null) {
-            throw new Error('element_array_buffer_data not allow set data to null');
-            return false;
-          }
-          if (isObject(val2)) {
-            t.element_array_buffer_data = val2;
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, val2.data, gl[val2.usage ?? 'STATIC_DRAW']);
-            return true;
-          }
-          return false;
         }
         return Reflect.set(t, p, val);
       },
@@ -411,6 +411,26 @@ export function createProxyGLfromWebglProgram<
         return program;
       },
       array_buffer: null as WebGLBuffer | null,
+      get array_buffer_() {
+        assert(res.array_buffer);
+        return {
+          /** @proxy @type {gl.bufferData} */
+          data({
+            data,
+            usage = 'STATIC_DRAW',
+            offset = 0,
+            length = 0,
+          }: {
+            data: TypedArray;
+            usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
+            offset?: number;
+            length?: number;
+          }) {
+            assert(res.array_buffer);
+            gl.bufferData(gl.ARRAY_BUFFER, data, gl[usage], offset, length);
+          },
+        };
+      },
       set array_buffer_data(opt: {
         data: TypedArray;
         usage?: 'STATIC_DRAW' | 'DYNAMIC_DRAW' | 'STREAM_DRAW';
@@ -439,13 +459,12 @@ export function createProxyGLfromWebglProgram<
         gl.drawArraysInstanced(gl[opt.mode], opt.first ?? 0, opt.count, opt.instance_count);
       },
       draw_element(opt: { mode: 'TRIANGLES' | 'POINTS'; count: number; offset?: number }) {
-        assert(res.vertext_array.element_array_buffer_data);
-        assert(res.vertext_array.element_array_buffer_data.data.length >= opt.count);
-        assert(res.vertext_array.element_array_buffer_data__type);
+        assert(res.vertext_array.element_array_buffer);
+        assert(res.vertext_array.element_array_buffer_.index_type);
         gl.drawElements(
           gl[opt.mode],
           opt.count,
-          gl[res.vertext_array.element_array_buffer_data__type],
+          gl[res.vertext_array.element_array_buffer_.index_type],
           opt.offset ?? 0
         );
       },
@@ -455,13 +474,12 @@ export function createProxyGLfromWebglProgram<
         instance_count: number;
         offset?: number;
       }) {
-        assert(res.vertext_array.element_array_buffer_data);
-        assert(res.vertext_array.element_array_buffer_data__type);
-        assert(res.vertext_array.element_array_buffer_data.length >= opt.count);
+        assert(res.vertext_array.element_array_buffer);
+        assert(res.vertext_array.element_array_buffer_.index_type);
         gl.drawElementsInstanced(
           gl[opt.mode],
           opt.count ?? 0,
-          gl[res.vertext_array.element_array_buffer_data__type],
+          gl[res.vertext_array.element_array_buffer_.index_type],
           opt.offset ?? 0,
           opt.instance_count
         );
@@ -474,9 +492,7 @@ export function createProxyGLfromWebglProgram<
       set(target, field, new_val, old_val) {
         if (field == 'array_buffer') {
           assert(new_val === null || new_val instanceof WebGLBuffer);
-          target.array_buffer = new_val;
           gl.bindBuffer(gl.ARRAY_BUFFER, new_val);
-          return true;
         }
         return Reflect.set(target, field, new_val, old_val);
       },
