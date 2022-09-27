@@ -143,7 +143,6 @@ onMount(async () => {
   const gl = pgl.gl;
   pgl.inspect = true;
 
-  gl.TEXTURE_2D_ARRAY;
   const TEXTURE_IMG1_IDX = 1;
 
   const sz = 300;

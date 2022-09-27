@@ -54,3 +54,16 @@ type _TEST_U3 = InferUniform<'uniform int u_texture_index;'>;
 type _TEST_A1 = InferAttribute<'in vec3 u_texture; '>;
 type _TEST_A2 = InferAttribute<' layout(location=6) in mat4 u_textures;'>;
 type _TEST_A3 = InferAttribute<'in int[5] u_texture_index;'>;
+type _TEST_C = InferAttribute<`#version 300 es
+#pragma vscode_glsllint_stage: frag
+precision mediump float;
+precision mediump sampler2DArray;
+
+uniform sampler2DArray u_textures;
+uniform int u_texture_index;
+in vec2 v_uv;
+in vec3 v_color;
+out vec4 o_color;
+void main() {
+  o_color = vec4(v_color, 1.0) * texture(u_textures, vec3(v_uv, u_texture_index));
+}`>;
