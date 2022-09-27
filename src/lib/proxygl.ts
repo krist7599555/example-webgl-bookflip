@@ -93,7 +93,7 @@ export function createProxyGLfromWebglProgram<
     },
   });
   type VAOAttrProxy = {
-    [key in keyof T['attributes']]: {
+    readonly [key in keyof T['attributes']]: {
       /**
        * real webgl location from program
        */
@@ -165,29 +165,28 @@ export function createProxyGLfromWebglProgram<
     };
   };
 
-  const uniforms: Simplify<UniformProxy> = range(
-    gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
-  ).reduce((acc, i) => {
-    const info = gl.getActiveUniform(program, i)!;
-    const str_type = gl_parameter_name(gl, info.type);
-    console.log(str_type);
-    assert(is_webgl_type(str_type));
-    const new_uniform: ValueOf<UniformProxy> = new Proxy(
-      {
-        location: gl.getUniformLocation(program, info.name)!,
-        name: info.name,
-        size: info.size,
-        type: str_type,
-        data: [] as Iterable<number>,
-      },
-      {
-        set(target, field, new_val) {
-          if (field == 'data') {
-            assert(isTypedArray(new_val) || (isArray(new_val) && new_val.every(isNumber)));
-            const [...nums] = new_val as Float32Array | number[] | Iterable<number>;
+  const uniforms: UniformProxy = range(gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)).reduce(
+    (acc, i) => {
+      const info = gl.getActiveUniform(program, i)!;
+      const str_type = gl_parameter_name(gl, info.type);
+      console.log(str_type);
+      assert(is_webgl_type(str_type));
+      const new_uniform: ValueOf<UniformProxy> = new Proxy(
+        {
+          location: gl.getUniformLocation(program, info.name)!,
+          name: info.name,
+          size: info.size,
+          type: str_type,
+          data: [] as Iterable<number>,
+        },
+        {
+          set(target, field, new_val) {
+            if (field == 'data') {
+              assert(isTypedArray(new_val) || (isArray(new_val) && new_val.every(isNumber)));
+              const [...nums] = new_val as Float32Array | number[] | Iterable<number>;
 
-            // prettier-ignore
-            match(str_type)
+              // prettier-ignore
+              match(str_type)
               .with("FLOAT", () => gl.uniform1fv(target.location, nums))
               .with("FLOAT_VEC2", () => gl.uniform2fv(target.location, nums))
               .with("FLOAT_VEC3", () => gl.uniform3fv(target.location, nums))
@@ -213,22 +212,24 @@ export function createProxyGLfromWebglProgram<
               .with("SAMPLER_2D_ARRAY", () => gl.uniform1iv(target.location, nums))
               //@ts-expect-error
               .exhaustive()
-            target.data = nums;
-            return true;
-          }
-          return false;
-        },
-      }
-    );
-    // @ts-ignore
-    acc[info.name] = new_uniform;
-    return acc;
-  }, {} as UniformProxy);
+              target.data = nums;
+              return true;
+            }
+            return false;
+          },
+        }
+      );
+      // @ts-ignore
+      acc[info.name] = new_uniform;
+      return acc;
+    },
+    {} as UniformProxy
+  );
 
-  const vertext_array_attribute_original: Simplify<VAOAttrProxy> = range(
+  const attributes: VAOAttrProxy = range(
     gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES)
   ).reduce((acc, i) => {
-    const info = gl.getActiveAttrib(program, i)!;
+    const info: WebGLActiveInfo = gl.getActiveAttrib(program, i)!;
     const str_type = gl_parameter_name(gl, info.type);
     assert(is_webgl_type(str_type));
     // @ts-ignore
@@ -336,11 +337,6 @@ export function createProxyGLfromWebglProgram<
     return { ...acc, [info.name]: a };
   }, {} as VAOAttrProxy);
 
-  const vertext_array_attribute_proxy = new Proxy(vertext_array_attribute_original, {
-    set() {
-      return false;
-    },
-  });
   const vao = gl.createVertexArray()!; // TODO: for now have single vao
   gl.bindVertexArray(vao);
   const vertext_array = new Proxy(
@@ -348,8 +344,10 @@ export function createProxyGLfromWebglProgram<
       get vao() {
         return vao;
       },
-      get attributes() {
-        return vertext_array_attribute_proxy;
+      get attributes(): {
+        [key in keyof typeof attributes]: typeof attributes[key];
+      } {
+        return attributes;
       },
       element_array_buffer: null as WebGLBuffer | null,
       element_array_buffer__private_index_type: null as
@@ -400,6 +398,7 @@ export function createProxyGLfromWebglProgram<
 
   const res = new Proxy(
     {
+      $$type_uniforms: null as any as T['uniforms'],
       get gl() {
         return gl;
       },
@@ -556,7 +555,7 @@ export function createProxyGLfromWebglProgram<
       get vertext_array() {
         return vertext_array;
       },
-      get uniforms() {
+      get uniforms(): { [key in keyof typeof uniforms]: typeof uniforms[key] } {
         return uniforms;
       },
       draw_array(opt: { mode: GlEnumDrawMode; count: number; first?: number }) {

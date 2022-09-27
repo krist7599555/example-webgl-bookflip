@@ -1,7 +1,11 @@
 const EL_SIZE = {
   byte: 1,
   bool: 1,
+  short: 2,
   int: 4,
+  uint: 4,
+  uint8: 1,
+  uint16: 2,
   float: 4,
 } as const;
 const EL_COUNT = {
@@ -34,7 +38,7 @@ type ByteKey = ByteBase | ByteStruct | `${ByteBase}_${ByteStruct}`;
 export const BYTE = new Proxy<Record<Lowercase<ByteKey> | Uppercase<ByteKey>, number>>({} as any, {
   get(target, _p, _receiver) {
     const p = _p.toString().toLowerCase() as Lowercase<ByteKey>;
-
+    console.log(p, p in EL_SIZE, EL_SIZE);
     // @ts-ignore
     if (p in EL_SIZE) return EL_SIZE[p];
     // @ts-ignore
