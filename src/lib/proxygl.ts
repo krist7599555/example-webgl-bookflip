@@ -272,7 +272,7 @@ export function createProxyGLfromWebglProgram<
           const base_type = WEBGL_TYPE_TABLE[a.type].base_type;
           assert(res.array_buffer, 'need to bind gl.ARRAY_BUFFER to call gl.vertexAttribPointer. ');
           this.buffer = res.array_buffer; // ! assign from current array_buffer
-          assert(base_type == 'FLOAT');
+          // assert(base_type == 'FLOAT');
           const base_type_i = gl[base_type];
           for (const o of this._loc_and_offset) {
             gl.vertexAttribPointer(

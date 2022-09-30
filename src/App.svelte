@@ -47,12 +47,16 @@ function gen_paper_mesh(w: number, h: number) {
 
 const VERTEX_SHADER = /*glsl*/ `#version 300 es
   #pragma vscode_glsllint_stage: vert
+  
   in vec2 a_position;
   in vec2 a_uv;
+  in vec2 a_roll;
+  in float a_texture_index;
+
   uniform mat4 u_mvp;
-  uniform float u_timestamp;
   out vec2 v_uv;
   out vec3 v_color;
+  out float v_texture_index;
 
   vec3 projection(in vec3 point, in vec3 line) {
     return (dot(point, line) / dot(line, line)) * line;
@@ -79,30 +83,33 @@ const VERTEX_SHADER = /*glsl*/ `#version 300 es
   const vec3 ONE = vec3(1.0, 1.0, 1.0);
   
   void main() {
+    v_texture_index = a_texture_index;
     gl_PointSize = 50.0;
     v_uv = a_uv;
 
-    float t2 = u_timestamp * 0.0005;
     vec3 pos = vec3(a_position + vec2(0.1, 0.1), 0.0);
-    vec3 roll = vec3(abs(sin(t2)), abs(cos(t2)), 0.0);
+    vec3 roll = vec3(a_roll, 0.0);
     vec3 spine = vec3(0.0, -1.0, 0.0);
     vec3 proj_roll = projection(pos, roll);
     float dist_from_roll = distance(pos, proj_roll);
     // hack test
     // dist_from_roll = min(dist_from_roll, PI * R);
-    v_color = vec3(0.5, 0.5, 0.5);
+    // v_color = vec3(0.5, 0.5, 0.5);
+    v_color = vec3(1.0, 1.0, 1.0);
     vec3 o_output = vec3(0.0, 0.0, 0.0);
     if (is_between(pos.xy, roll.xy, spine.xy)) {
       dist_from_roll = 0.0;
-      v_color = vec3(0.5, 1.0, 0.5);
+      // v_color = vec3(0.5, 1.0, 0.5);
       o_output = pos;
     }
     if (0.0 < dist_from_roll) {
       float rem = min(dist_from_roll, PI * R);
       float progress = rem / (PI * R);
-      v_color = vec3(0.5, 0.5, 1.0);
+      // v_color = vec3(0.5, 0.5, 1.0);
       if (progress < 0.5) {
-        v_color = vec3(1.0, 1.0, 0.5);
+        // v_color = vec3(1.0, 1.0, 0.5);
+      } else {
+        v_color = vec3(0.5, 0.5, 0.5);
       }
       vec3 axis0 = vec3(0.0, 0.0, R);
       vec3 axis1 = normalize(pos - proj_roll) * R;
@@ -116,9 +123,12 @@ const VERTEX_SHADER = /*glsl*/ `#version 300 es
       dest.z -= 2.0 * R;
       dest += normalize(proj_roll - pos) * dist_from_roll;
       v_color = vec3(1.0, 0.5, 0.5);
+      v_color = vec3(0.7, 0.7, 0.7);
       o_output.x -= dist_from_roll;
       o_output = dest;
     }
+    
+    o_output.z += a_texture_index * 0.001; // stack page
     gl_Position = u_mvp * vec4(o_output, 1.0);
   }`;
 const FRAGMENT_SHADER = /*glsl*/ `#version 300 es
@@ -127,12 +137,14 @@ const FRAGMENT_SHADER = /*glsl*/ `#version 300 es
   precision mediump sampler2DArray;
 
   uniform sampler2DArray u_textures;
-  uniform int u_texture_index;
+  
   in vec2 v_uv;
   in vec3 v_color;
+  in float v_texture_index;
+
   out vec4 o_color;
   void main() {
-    o_color = vec4(v_color, 1.0) * texture(u_textures, vec3(v_uv, u_texture_index));
+    o_color = vec4(v_color, 1.0) * texture(u_textures, vec3(v_uv, v_texture_index));
   }`;
 
 onMount(async () => {
@@ -175,7 +187,8 @@ onMount(async () => {
   const paper = gen_paper_mesh(100, 100);
   {
     const { a_position, a_uv } = pgl.vertext_array.attributes;
-
+    //     float t2 = u_timestamp * 0.0005;
+    // vec3 roll = vec3(abs(sin(t2)), abs(cos(t2)), 0.0);
     pgl.array_buffer_.bind(gl.createBuffer()).data({
       data: new Float32Array(paper.verties),
     });
@@ -200,8 +213,29 @@ onMount(async () => {
   gl.clearColor(0.6, 0.8, 0.85, 1);
   animationFrames().subscribe(({ timestamp: t }) => {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    const { a_roll, a_texture_index } = pgl.vertext_array.attributes;
     // pgl.uniforms.u_texture_index.data = [Math.round(t * 0.005) % 3];
-    pgl.uniforms.u_timestamp.data = [t];
+    pgl.array_buffer_.bind(gl.createBuffer()).data({
+      data: new Float32Array([
+        Math.abs(Math.sin(t * 0.001)),
+        Math.abs(Math.cos(t * 0.001)),
+        1,
+        0,
+        0,
+        1,
+      ]),
+    });
+    a_roll.enabled = true;
+    a_roll.divisor = 1;
+
+    pgl.array_buffer_.bind(gl.createBuffer()).data({
+      data: new Float32Array([0, 1, 2]),
+    });
+    a_texture_index.enabled = true;
+    a_texture_index.divisor = 1;
+
+    pgl.array_buffer = null;
+
     const u_mvp = new Matrix4()
       .multiplyLeft(
         new Matrix4()
@@ -209,19 +243,17 @@ onMount(async () => {
           .scale(2)
           .translate([-0.5, -0.5, 0])
       )
-      .multiplyLeft(
-        new Matrix4().lookAt({
-          eye: [0, -2, -4],
-        })
-      )
+      // .multiplyLeft(new Matrix4().lookAt({ eye: [0, -2, -4] }))
+      .multiplyLeft(new Matrix4().lookAt({ eye: [-0.2, 0.2, -2.45], center: [-0.2, 0.2, 0] }))
       .multiplyLeft(
         new Matrix4().perspective({ fovy: (45 * Math.PI) / 180, near: 0.01, far: 10000 })
       );
-    // console.log(u_mvp);
+
     pgl.uniforms.u_mvp.data = u_mvp;
-    pgl.draw_element({
+    pgl.draw_element_instanced({
       mode: 'TRIANGLES',
       count: paper.indices.length,
+      instance_count: 3,
     });
     pgl.inspect = false;
   });
