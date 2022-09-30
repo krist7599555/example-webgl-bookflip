@@ -75,7 +75,7 @@ const VERTEX_SHADER = /*glsl*/ `#version 300 es
   }
 
   const float PI = 3.141;
-  const float R = 0.01;
+  const float R = 0.1;
   const vec3 ONE = vec3(1.0, 1.0, 1.0);
   
   void main() {
@@ -101,7 +101,13 @@ const VERTEX_SHADER = /*glsl*/ `#version 300 es
       float rem = min(dist_from_roll, PI * R);
       float progress = rem / (PI * R);
       v_color = vec3(0.5, 0.5, 1.0);
-      vec3 dest = proj_roll - vec3(0.0, 0.0, 0.0 * R) * progress;
+      if (progress < 0.5) {
+        v_color = vec3(1.0, 1.0, 0.5);
+      }
+      vec3 axis0 = vec3(0.0, 0.0, R);
+      vec3 axis1 = normalize(pos - proj_roll) * R;
+      float angle = progress * PI;
+      vec3 dest = proj_roll - vec3(0.0, 0.0, R) + cos(angle) * axis0 + sin(angle) * axis1;
       o_output = dest;
       dist_from_roll -= rem;
     }
@@ -110,6 +116,7 @@ const VERTEX_SHADER = /*glsl*/ `#version 300 es
       dest.z -= 2.0 * R;
       dest += normalize(proj_roll - pos) * dist_from_roll;
       v_color = vec3(1.0, 0.5, 0.5);
+      o_output.x -= dist_from_roll;
       o_output = dest;
     }
     gl_Position = u_mvp * vec4(o_output, 1.0);
@@ -146,6 +153,9 @@ onMount(async () => {
   const TEXTURE_IMG1_IDX = 1;
 
   const sz = 300;
+
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthFunc(gl.LEQUAL);
 
   pgl.texture_active_index = TEXTURE_IMG1_IDX;
   pgl.texture_2d_array = gl.createTexture();
@@ -188,8 +198,8 @@ onMount(async () => {
   }
 
   gl.clearColor(0.6, 0.8, 0.85, 1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
   animationFrames().subscribe(({ timestamp: t }) => {
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     // pgl.uniforms.u_texture_index.data = [Math.round(t * 0.005) % 3];
     pgl.uniforms.u_timestamp.data = [t];
     const u_mvp = new Matrix4()
@@ -201,10 +211,12 @@ onMount(async () => {
       )
       .multiplyLeft(
         new Matrix4().lookAt({
-          eye: [0, -3, -3],
+          eye: [0, -2, -4],
         })
       )
-      .multiplyLeft(new Matrix4().perspective({ fovy: (45 * Math.PI) / 180 }));
+      .multiplyLeft(
+        new Matrix4().perspective({ fovy: (45 * Math.PI) / 180, near: 0.01, far: 10000 })
+      );
     // console.log(u_mvp);
     pgl.uniforms.u_mvp.data = u_mvp;
     pgl.draw_element({
