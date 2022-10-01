@@ -169,7 +169,6 @@ export function createProxyGLfromWebglProgram<
     (acc, i) => {
       const info = gl.getActiveUniform(program, i)!;
       const str_type = gl_parameter_name(gl, info.type);
-      console.log(str_type);
       assert(is_webgl_type(str_type));
       const new_uniform: ValueOf<UniformProxy> = new Proxy(
         {
@@ -187,31 +186,31 @@ export function createProxyGLfromWebglProgram<
 
               // prettier-ignore
               match(str_type)
-              .with("FLOAT", () => gl.uniform1fv(target.location, nums))
-              .with("FLOAT_VEC2", () => gl.uniform2fv(target.location, nums))
-              .with("FLOAT_VEC3", () => gl.uniform3fv(target.location, nums))
-              .with("FLOAT_VEC4", () => gl.uniform4fv(target.location, nums))
-              .with("INT", () => gl.uniform1iv(target.location, nums))
-              .with("INT_VEC2", () => gl.uniform2iv(target.location, nums))
-              .with("INT_VEC3", () => gl.uniform3iv(target.location, nums))
-              .with("INT_VEC4", () => gl.uniform4iv(target.location, nums))
-              .with("UNSIGNED_INT", () => gl.uniform1uiv(target.location, nums))
-              .with("UNSIGNED_INT_VEC2", () => gl.uniform2uiv(target.location, nums))
-              .with("UNSIGNED_INT_VEC3", () => gl.uniform3uiv(target.location, nums))
-              .with("UNSIGNED_INT_VEC4", () => gl.uniform4uiv(target.location, nums))
-              .with("FLOAT_MAT2", () => gl.uniformMatrix2fv(target.location, false, nums))
-              .with("FLOAT_MAT2x3", () => gl.uniformMatrix2x3fv(target.location, false, nums))
-              .with("FLOAT_MAT2x4", () => gl.uniformMatrix2x4fv(target.location, false, nums))
-              .with("FLOAT_MAT3x2", () => gl.uniformMatrix3x2fv(target.location, false, nums))
-              .with("FLOAT_MAT3", () => gl.uniformMatrix3fv(target.location, false, nums))
-              .with("FLOAT_MAT3x4", () => gl.uniformMatrix3x4fv(target.location, false, nums))
-              .with("FLOAT_MAT4x2", () => gl.uniformMatrix4x2fv(target.location, false, nums))
-              .with("FLOAT_MAT4x3", () => gl.uniformMatrix4x3fv(target.location, false, nums))
-              .with("FLOAT_MAT4", () => gl.uniformMatrix4fv(target.location, false, nums))
-              .with("SAMPLER_2D", () => gl.uniform1iv(target.location, nums))
-              .with("SAMPLER_2D_ARRAY", () => gl.uniform1iv(target.location, nums))
-              //@ts-expect-error
-              .exhaustive()
+                .with("FLOAT",             () => gl.uniform1fv(target.location, nums))
+                .with("FLOAT_VEC2",        () => gl.uniform2fv(target.location, nums))
+                .with("FLOAT_VEC3",        () => gl.uniform3fv(target.location, nums))
+                .with("FLOAT_VEC4",        () => gl.uniform4fv(target.location, nums))
+                .with("INT",               () => gl.uniform1iv(target.location, nums))
+                .with("INT_VEC2",          () => gl.uniform2iv(target.location, nums))
+                .with("INT_VEC3",          () => gl.uniform3iv(target.location, nums))
+                .with("INT_VEC4",          () => gl.uniform4iv(target.location, nums))
+                .with("UNSIGNED_INT",      () => gl.uniform1uiv(target.location, nums))
+                .with("UNSIGNED_INT_VEC2", () => gl.uniform2uiv(target.location, nums))
+                .with("UNSIGNED_INT_VEC3", () => gl.uniform3uiv(target.location, nums))
+                .with("UNSIGNED_INT_VEC4", () => gl.uniform4uiv(target.location, nums))
+                .with("FLOAT_MAT2",        () => gl.uniformMatrix2fv(target.location, false, nums))
+                .with("FLOAT_MAT2x3",      () => gl.uniformMatrix2x3fv(target.location, false, nums))
+                .with("FLOAT_MAT2x4",      () => gl.uniformMatrix2x4fv(target.location, false, nums))
+                .with("FLOAT_MAT3x2",      () => gl.uniformMatrix3x2fv(target.location, false, nums))
+                .with("FLOAT_MAT3",        () => gl.uniformMatrix3fv(target.location, false, nums))
+                .with("FLOAT_MAT3x4",      () => gl.uniformMatrix3x4fv(target.location, false, nums))
+                .with("FLOAT_MAT4x2",      () => gl.uniformMatrix4x2fv(target.location, false, nums))
+                .with("FLOAT_MAT4x3",      () => gl.uniformMatrix4x3fv(target.location, false, nums))
+                .with("FLOAT_MAT4",        () => gl.uniformMatrix4fv(target.location, false, nums))
+                .with("SAMPLER_2D",        () => gl.uniform1iv(target.location, nums))
+                .with("SAMPLER_2D_ARRAY",  () => gl.uniform1iv(target.location, nums))
+                //@ts-expect-error
+                .exhaustive()
               target.data = nums;
               return true;
             }
@@ -225,6 +224,18 @@ export function createProxyGLfromWebglProgram<
     },
     {} as UniformProxy
   );
+
+  function computed_attrib_locations<T extends WebglType>(type: T) {
+    if (!type.includes('_MAT'))
+      return [{ location: 0, size: WEBGL_TYPE_TABLE[type].element_count, offset: 0 }];
+    const [srow, scol = srow] = type.split('MAT')[1].split('x');
+    const [row, col] = [+srow, +scol];
+    return range(0, row).map(i => ({
+      location: i,
+      size: col,
+      offset: WEBGL_TYPE_TABLE[type].base_type_byte * i * row,
+    }));
+  }
 
   const attributes: VAOAttrProxy = range(
     gl.getProgramParameter(program, gl.ACTIVE_ATTRIBUTES)
@@ -245,39 +256,39 @@ export function createProxyGLfromWebglProgram<
         stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
         buffer: null as null | WebGLBuffer,
         divisor: 0,
-        get _loc_and_offset(): VAOAttrProxy[keyof VAOAttrProxy]['_loc_and_offset'] {
-          if (str_type.includes('MAT')) {
-            const [srow, scol = srow] = str_type.split('MAT')[1].split('x');
-            const [row, col] = [+srow, +scol];
-            return range(0, row).map(i => ({
-              loc: (a.location + i) as number,
-              row,
-              col,
-              offset: WEBGL_TYPE_TABLE[str_type].base_type_byte * i * row,
-              stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
-            }));
-          } else {
-            return [
-              {
-                loc: a.location,
-                row: 1,
-                col: WEBGL_TYPE_TABLE[str_type].element_count,
-                offset: 0,
-                stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
-              },
-            ];
-          }
-        },
+        // get _loc_and_offset(): VAOAttrProxy[keyof VAOAttrProxy]['_loc_and_offset'] {
+        //   if (str_type.includes('MAT')) {
+        //     const [srow, scol = srow] = str_type.split('MAT')[1].split('x');
+        //     const [row, col] = [+srow, +scol];
+        //     return range(0, row).map(i => ({
+        //       loc: (a.location + i) as number,
+        //       row,
+        //       col,
+        //       offset: WEBGL_TYPE_TABLE[str_type].base_type_byte * i * row,
+        //       stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
+        //     }));
+        //   } else {
+        //     return [
+        //       {
+        //         loc: a.location,
+        //         row: 1,
+        //         col: WEBGL_TYPE_TABLE[str_type].element_count,
+        //         offset: 0,
+        //         stripe: WEBGL_TYPE_TABLE[str_type].size_byte,
+        //       },
+        //     ];
+        //   }
+        // },
         update_vertex_attrib_pointer() {
           const base_type = WEBGL_TYPE_TABLE[a.type].base_type;
           assert(res.array_buffer, 'need to bind gl.ARRAY_BUFFER to call gl.vertexAttribPointer. ');
           this.buffer = res.array_buffer; // ! assign from current array_buffer
           // assert(base_type == 'FLOAT');
           const base_type_i = gl[base_type];
-          for (const o of this._loc_and_offset) {
+          for (const o of computed_attrib_locations(this.type)) {
             gl.vertexAttribPointer(
-              o.loc,
-              o.col,
+              this.location + o.location,
+              o.size,
               base_type_i,
               a.normalize,
               a.stripe,
@@ -295,18 +306,17 @@ export function createProxyGLfromWebglProgram<
           }
           if (f == 'enabled') {
             assert(typeof new_val == 'boolean');
-            target.enabled = new_val;
             if (new_val) {
-              for (const o of target._loc_and_offset) {
-                gl.enableVertexAttribArray(o.loc);
+              for (const o of computed_attrib_locations(target.type)) {
+                gl.enableVertexAttribArray(target.location + o.location);
               }
               target.update_vertex_attrib_pointer();
             } else {
-              for (const o of target._loc_and_offset) {
-                gl.disableVertexAttribArray(o.loc);
+              for (const o of computed_attrib_locations(target.type)) {
+                gl.disableVertexAttribArray(target.location + o.location);
               }
             }
-            return true;
+            return Reflect.set(target, f, new_val);
           }
           if (f == 'offset' || f == 'stripe') {
             assert(
@@ -317,18 +327,18 @@ export function createProxyGLfromWebglProgram<
             // @ts-ignore
             const gl_type = gl[target.type];
             assert(typeof gl_type == 'number');
-            target[f] = new_val;
+            const out = Reflect.set(target, f, new_val);
             target.buffer = res.array_buffer; // INTERNAL USE ACRIVE ARRAY BUFFER
             target.update_vertex_attrib_pointer();
-            return true;
+            return out;
           }
           if (f == 'divisor') {
             assert(typeof new_val == 'number');
-            target.divisor = new_val;
-            for (const o of target._loc_and_offset) {
-              gl.vertexAttribDivisor(o.loc, new_val);
+            const out = Reflect.set(target, f, new_val);
+            for (const o of computed_attrib_locations(target.type)) {
+              gl.vertexAttribDivisor(target.location + o.location, new_val);
             }
-            return true;
+            return out;
           }
           return false;
         },
